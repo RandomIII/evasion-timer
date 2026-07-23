@@ -144,8 +144,7 @@
   .cell .k{font-family:var(--cond);text-transform:uppercase;letter-spacing:.22em;font-size:10px;color:var(--dim);}
   .cell .v{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:14px;color:var(--ink);}
 
-  /* ---------- console ---------- */
-  .console{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:8px;width:min(880px,92vw);}
+  /* ---------- champs et boutons (réutilisés dans le menu) ---------- */
   input[type=time]{font-family:var(--mono);font-size:16px;color:var(--ink);
                    background:#070A13;border:1px solid #222C4A;padding:8px 11px;color-scheme:dark;}
   input[type=time]:focus-visible,button:focus-visible{outline:2px solid var(--glow);outline-offset:2px;}
@@ -153,9 +152,49 @@
          color:var(--ink);background:#070A13;border:1px solid #222C4A;padding:10px 13px;cursor:pointer;
          transition:background .12s,border-color .12s,color .12s;}
   button:hover{background:#0F1626;border-color:var(--glow);color:var(--glow);}
-  button.go{border-color:var(--glow);color:var(--glow);}
-  button.go:hover{background:var(--glow);color:var(--void);}
   button[aria-pressed=true]{background:var(--glow);color:var(--void);border-color:var(--glow);}
+
+  /* ---------- bouton ☰ et panneau de réglages ---------- */
+  .menuBtn{
+    position:fixed;z-index:40;
+    top:calc(12px + env(safe-area-inset-top));right:calc(12px + env(safe-area-inset-right));
+    width:44px;height:44px;display:flex;flex-direction:column;justify-content:center;gap:5px;
+    padding:11px;background:rgba(7,10,19,.7);border:1px solid #222C4A;cursor:pointer;
+    -webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);
+  }
+  .menuBtn span{display:block;height:2px;width:100%;background:var(--ink);
+                transition:transform .25s,opacity .25s,background .12s;transform-origin:center;}
+  .menuBtn:hover{border-color:var(--glow);}
+  .menuBtn:hover span{background:var(--glow);}
+  .menuBtn:focus-visible{outline:2px solid var(--glow);outline-offset:2px;}
+  .menuBtn[aria-expanded=true] span:nth-child(1){transform:translateY(7px) rotate(45deg);}
+  .menuBtn[aria-expanded=true] span:nth-child(2){opacity:0;}
+  .menuBtn[aria-expanded=true] span:nth-child(3){transform:translateY(-7px) rotate(-45deg);}
+
+  .backdrop{
+    position:fixed;inset:0;z-index:38;background:rgba(2,3,8,.6);
+    -webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);
+    opacity:0;visibility:hidden;transition:opacity .28s,visibility .28s;
+  }
+  .panel{
+    position:fixed;z-index:39;top:0;right:0;height:100dvh;width:min(340px,86vw);
+    background:linear-gradient(#0A0E1A,#070A13);border-left:1px solid #222C4A;
+    padding:calc(72px + env(safe-area-inset-top)) 20px calc(20px + env(safe-area-inset-bottom));
+    display:flex;flex-direction:column;gap:14px;overflow-y:auto;
+    box-shadow:-24px 0 60px rgba(0,0,0,.55);
+    transform:translateX(100%);transition:transform .28s cubic-bezier(.4,0,.2,1);
+  }
+  body.menu-open .panel{transform:none;}
+  body.menu-open .backdrop{opacity:1;visibility:visible;}
+  .panel h2{font-family:var(--cond);text-transform:uppercase;letter-spacing:.3em;
+            font-size:14px;color:var(--glow);margin:0;text-shadow:0 0 20px var(--glow);}
+  .panel label{display:flex;flex-direction:column;gap:5px;
+               font-family:var(--cond);text-transform:uppercase;letter-spacing:.16em;
+               font-size:11px;color:var(--dim);}
+  .panel label input[type=time]{width:100%;font-size:18px;}
+  .panelRow{display:flex;gap:8px;}
+  .panelRow button{flex:1;}
+  .panel .reset{margin-top:4px;font-size:11px;letter-spacing:.08em;line-height:1.5;}
 
   /* ---------- états ---------- */
   /* paliers : 1h jaune · 15 min orange · 5 min rouge · 1 min violet · 10 s arc-en-ciel */
@@ -175,7 +214,7 @@
     animation-delay:calc(var(--w,0) * -.075s);
   }
   body.arc .eyebrow{--w:0}  body.arc .sub{--w:9}      body.arc .day{--w:11}
-  body.arc .telemetry{--w:13}  body.arc .console{--w:15}
+  body.arc .telemetry{--w:13}
   @keyframes arcenciel{from{filter:hue-rotate(0deg)}to{filter:hue-rotate(360deg)}}
   @keyframes shakeWild{
     0%  {transform:translate(0,0)       rotate(0deg)}
@@ -264,15 +303,15 @@
                     linear-gradient(#E5A45C,#C07C39);
           border-radius:50% 50% 14% 14% / 100% 100% 22% 22%;}
 
-  /* ---------- téléphone : horaires figés, plus aucune commande ---------- */
+  /* ---------- téléphone en portrait ---------- */
   @media (max-width:720px){
     :root{--u:clamp(30px,10.5vw,58px);}
     .stage{
       gap:clamp(8px,1.6vh,16px);
       padding:calc(14px + env(safe-area-inset-top)) 12px calc(14px + env(safe-area-inset-bottom));
     }
-    .console{display:none;}                       /* réglage automatique, rien à toucher */
-    .eyebrow{letter-spacing:.26em;font-size:10px;flex-wrap:wrap;justify-content:center;}
+    .eyebrow{letter-spacing:.26em;font-size:10px;flex-wrap:wrap;justify-content:center;
+             max-width:78vw;}                     /* ne pas passer sous le bouton ☰ */
     .sub{font-size:clamp(16px,6.5vw,30px);}
     .telemetry{grid-template-columns:repeat(2,1fr);}
     .cell{padding:7px 10px;}
@@ -282,6 +321,16 @@
     .libre{font-size:clamp(56px,21vw,150px);}
     .burger{width:clamp(96px,26vw,140px);height:clamp(78px,12vh,120px);}
     .banner{font-size:clamp(15px,5vw,26px);letter-spacing:.24em;}
+  }
+
+  /* ---------- téléphone en paysage : rien que le timer ---------- */
+  @media (max-width:960px) and (orientation:landscape){
+    :root{--u:clamp(24px,12vh,54px);}            /* dimensionné sur la hauteur, l'écran est bas */
+    .stage{gap:clamp(4px,1.4vh,12px);}
+    .telemetry,.day,.banner{display:none;}       /* on cache Phase, Travail effectif, la frise… */
+    .eyebrow{font-size:10px;letter-spacing:.24em;}
+    .sub{font-size:clamp(14px,4.6vh,26px);}
+    .libre{font-size:clamp(44px,22vh,150px);}
   }
 
   @media (prefers-reduced-motion: reduce){
@@ -335,28 +384,48 @@
     <div class="cell"><span class="k">rafraîchissement</span><span class="v" id="tFps">—</span></div>
   </div>
 
-  <div class="console">
-    <input type="time" id="when" step="60" aria-label="Heure de départ" />
-    <button class="go" id="arm">Recaler</button>
-    <button data-add="5">+5 min</button>
-    <button data-add="15">+15 min</button>
-    <button data-add="-5">−5 min</button>
+</main>
+
+<!-- Menu ☰ : réglages, superposé, accessible sur téléphone comme au bureau -->
+<button class="menuBtn" id="menuBtn" aria-label="Réglages" aria-expanded="false" aria-controls="panel">
+  <span></span><span></span><span></span>
+</button>
+<div class="backdrop" id="backdrop"></div>
+<aside class="panel" id="panel" aria-label="Réglages des horaires">
+  <h2>Horaires</h2>
+  <label>Début de journée<input type="time" id="hDebut" step="60"></label>
+  <label>Début de pause<input type="time" id="hDej" step="60"></label>
+  <label>Fin de pause<input type="time" id="hRep" step="60"></label>
+  <label>Fin de journée<input type="time" id="hDep" step="60"></label>
+  <div class="panelRow">
     <button id="sound" aria-pressed="false">Son</button>
     <button id="full">Plein écran</button>
   </div>
-</main>
+  <button class="reset" id="reset">Réinitialiser · 08:30–16:30, pause 12:00–13:00</button>
+</aside>
 
 <script>
 (() => {
   "use strict";
 
-  /* ============ horaires de la journée — modifie ici ============ */
-  const JOUR = {
-    debut:    [8, 30],   // arrivée
-    dejeuner: [12, 0],   // début de la pause repas
-    reprise:  [13, 0],   // fin de la pause repas
-    depart:   [16, 30]   // libération
+  /* ============ horaires de la journée ============ */
+  const DEF = {           // valeurs d'usine, restaurables via le menu
+    debut:    [8, 30],    // arrivée
+    dejeuner: [12, 0],    // début de la pause repas
+    reprise:  [13, 0],    // fin de la pause repas
+    depart:   [16, 30]    // libération
   };
+  const CLE = "evasion.horaires";
+  const clone = o => JSON.parse(JSON.stringify(o));   // WebView ancienne : pas de structuredClone
+  function chargeHoraires(){          // réglages mémorisés d'une session à l'autre
+    try {
+      const o = JSON.parse(localStorage.getItem(CLE));
+      if (o && o.debut && o.dejeuner && o.reprise && o.depart) return o;
+    } catch { /* stockage indisponible : on repart des valeurs d'usine */ }
+    return clone(DEF);
+  }
+  let horaires = chargeHoraires();
+  function sauveHoraires(){ try { localStorage.setItem(CLE, JSON.stringify(horaires)); } catch {} }
   /* Paliers d'urgence avant le départ, du plus lointain au plus proche.
      Le premier dont le seuil est atteint gagne, d'où l'ordre décroissant.        */
   const SEUILS = [
@@ -412,12 +481,12 @@
   const nowUs = () => (anchorDate * 1000) + Math.round((performance.now() - anchorPerf) * 1000);
 
   /* --- jalons de la journée --- */
-  let depart = JOUR.depart.slice();   // modifiable via la console
   let A = null;                       // jalons du jour en cours, en ms
 
   function anchorsFor(day){
     const mk = ([h, m]) => { const d = new Date(day); d.setHours(h, m, 0, 0); return d.getTime(); };
-    return { debut: mk(JOUR.debut), dej: mk(JOUR.dejeuner), rep: mk(JOUR.reprise), dep: mk(depart) };
+    return { debut: mk(horaires.debut), dej: mk(horaires.dejeuner),
+             rep: mk(horaires.reprise), dep: mk(horaires.depart) };
   }
   function recale(){
     // toujours la journée en cours : rouvrir la fenêtre à 17h doit afficher LIBRE,
@@ -426,13 +495,14 @@
     jourAffiche = new Date().getDate();
     freed = false; lastSecond = -1;
     document.body.classList.remove("free");
-    $("when").value = pad(depart[0], 2) + ":" + pad(depart[1], 2);
+    syncMenu();
 
-    // frise : la bande et ses étiquettes partagent la même échelle
-    const span = A.dep - A.debut;
-    const pos = ms => ((ms - A.debut) / span * 100) + "%";
+    // frise : la bande et ses étiquettes partagent la même échelle.
+    // clamp au cas où l'utilisateur saisit des horaires dans le désordre.
+    const span = Math.max(1, A.dep - A.debut);
+    const pos = ms => Math.max(0, Math.min(100, (ms - A.debut) / span * 100)) + "%";
     $("band").style.left  = pos(A.dej);
-    $("band").style.width = ((A.rep - A.dej) / span * 100) + "%";
+    $("band").style.width = Math.max(0, Math.min(100, (A.rep - A.dej) / span * 100)) + "%";
     $("k1").textContent = hhmm(A.debut);
     $("k4").textContent = hhmm(A.dep);
     $("k2").textContent = hhmm(A.dej); $("k2").style.left = pos(A.dej);
@@ -778,20 +848,36 @@
     }
   }
 
-  /* --- commandes --- */
-  function fromInput(){
-    const v = $("when").value;
-    if (!v) return;
-    const [h, m] = v.split(":").map(Number);
-    depart = [h, m]; recale();
+  /* --- menu de réglages --- */
+  const CHAMPS = { hDebut: "debut", hDej: "dejeuner", hRep: "reprise", hDep: "depart" };
+  function syncMenu(){                          // reflète les horaires courants dans les champs
+    for (const [id, key] of Object.entries(CHAMPS))
+      $(id).value = pad(horaires[key][0], 2) + ":" + pad(horaires[key][1], 2);
   }
-  $("arm").addEventListener("click", fromInput);
-  $("when").addEventListener("change", fromInput);
-  document.querySelectorAll("[data-add]").forEach(btn =>
-    btn.addEventListener("click", () => {
-      const d = new Date(A.dep + Number(btn.dataset.add) * 60000);
-      depart = [d.getHours(), d.getMinutes()]; recale();
-    }));
+  for (const [id, key] of Object.entries(CHAMPS)){
+    $(id).addEventListener("change", () => {
+      const v = $(id).value;
+      if (!v) return;
+      const [h, m] = v.split(":").map(Number);
+      horaires[key] = [h, m];
+      sauveHoraires();
+      recale();
+    });
+  }
+  $("reset").addEventListener("click", () => {
+    horaires = clone(DEF);
+    sauveHoraires();
+    recale();
+  });
+
+  function ouvreMenu(o){
+    document.body.classList.toggle("menu-open", o);
+    $("menuBtn").setAttribute("aria-expanded", String(o));
+  }
+  $("menuBtn").addEventListener("click", () =>
+    ouvreMenu(!document.body.classList.contains("menu-open")));
+  $("backdrop").addEventListener("click", () => ouvreMenu(false));
+
   $("sound").addEventListener("click", e => {
     soundOn = !soundOn;
     e.currentTarget.setAttribute("aria-pressed", String(soundOn));
@@ -802,6 +888,7 @@
     else document.documentElement.requestFullscreen?.();
   });
   addEventListener("keydown", e => {
+    if (e.key === "Escape") ouvreMenu(false);
     if (e.key.toLowerCase() === "f") $("full").click();
     if (e.key.toLowerCase() === "r") recale();
   });
