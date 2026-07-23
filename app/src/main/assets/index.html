@@ -192,6 +192,13 @@
                font-family:var(--cond);text-transform:uppercase;letter-spacing:.16em;
                font-size:11px;color:var(--dim);}
   .panel label input[type=time]{width:100%;font-size:18px;}
+  /* interrupteur de la pause */
+  .panel label.switch{flex-direction:row;align-items:center;gap:10px;cursor:pointer;
+                      color:var(--ink);font-size:12px;}
+  .panel label.switch input{width:18px;height:18px;accent-color:var(--glow);cursor:pointer;margin:0;}
+  #pauseFields{display:flex;flex-direction:column;gap:14px;transition:opacity .2s;}
+  #pauseFields.off{opacity:.35;}                 /* grisé quand la pause est désactivée */
+  #pauseFields.off input{pointer-events:none;}
   .panelRow{display:flex;gap:8px;}
   .panelRow button{flex:1;}
   .panel .reset{margin-top:4px;font-size:11px;letter-spacing:.08em;line-height:1.5;}
@@ -205,17 +212,33 @@
   body.violet{--glow:#B14DFF;--magenta:#F06BFF;}
   body.violet .stage{animation:shakeFast .05s infinite;}
 
-  body.arc{--glow:#FF0066;--magenta:#FF0066;}
+  /* --glow enregistrée comme couleur : sans ça, une custom property s'anime par à-coups
+     au lieu de s'interpoler entre les 8 teintes. */
+  @property --glow{ syntax:"<color>"; inherits:true; initial-value:#00E5FF; }
+
+  body.arc{--glow:#FF0000;--magenta:#FF0000;}
   body.arc .stage{animation:shakeWild .07s infinite;}
-  /* vague RGB : un même cycle, décalé bloc par bloc — le principe du clavier gamer */
+  /* vague RGB façon clavier gamer : même cycle, décalé bloc par bloc de gauche à droite */
   body.arc .eyebrow, body.arc .sub, body.arc .day, body.arc .telemetry,
-  body.arc .console, body.arc .d7, body.arc .colon{
-    animation:arcenciel 1.4s linear infinite;
-    animation-delay:calc(var(--w,0) * -.075s);
+  body.arc .readout .d7, body.arc .readout .colon{
+    animation:arcCycle 1.15s linear infinite;
+    animation-delay:calc(var(--w,0) * -.05s);
   }
-  body.arc .eyebrow{--w:0}  body.arc .sub{--w:9}      body.arc .day{--w:11}
-  body.arc .telemetry{--w:13}
-  @keyframes arcenciel{from{filter:hue-rotate(0deg)}to{filter:hue-rotate(360deg)}}
+  body.arc .us{color:var(--glow);opacity:1;filter:none;}   /* les µs suivent la vague aussi */
+  body.arc .eyebrow{--w:0}  body.arc .sub{--w:6}  body.arc .day{--w:9}
+  body.arc .telemetry{--w:11}
+  /* palette saturée à fond, ordre exact : rouge→orange→jaune→vert→cyan→indigo→violet→rose */
+  @keyframes arcCycle{
+    0%   {--glow:#FF0000}
+    12.5%{--glow:#FF8000}
+    25%  {--glow:#FFE000}
+    37.5%{--glow:#00FF00}
+    50%  {--glow:#00FFFF}
+    62.5%{--glow:#3300FF}
+    75%  {--glow:#B400FF}
+    87.5%{--glow:#FF0080}
+    100% {--glow:#FF0000}
+  }
   @keyframes shakeWild{
     0%  {transform:translate(0,0)       rotate(0deg)}
     14% {transform:translate(-10px,7px)  rotate(-1.1deg)}
@@ -394,8 +417,11 @@
 <aside class="panel" id="panel" aria-label="Réglages des horaires">
   <h2>Horaires</h2>
   <label>Début de journée<input type="time" id="hDebut" step="60"></label>
-  <label>Début de pause<input type="time" id="hDej" step="60"></label>
-  <label>Fin de pause<input type="time" id="hRep" step="60"></label>
+  <label class="switch"><input type="checkbox" id="pauseOn"><span>Pause déjeuner</span></label>
+  <div id="pauseFields">
+    <label>Début de pause<input type="time" id="hDej" step="60"></label>
+    <label>Fin de pause<input type="time" id="hRep" step="60"></label>
+  </div>
   <label>Fin de journée<input type="time" id="hDep" step="60"></label>
   <div class="panelRow">
     <button id="sound" aria-pressed="false">Son</button>
@@ -413,14 +439,18 @@
     debut:    [8, 30],    // arrivée
     dejeuner: [12, 0],    // début de la pause repas
     reprise:  [13, 0],    // fin de la pause repas
-    depart:   [16, 30]    // libération
+    depart:   [16, 30],   // libération
+    pause:    true         // pause déjeuner active ?
   };
   const CLE = "evasion.horaires";
   const clone = o => JSON.parse(JSON.stringify(o));   // WebView ancienne : pas de structuredClone
   function chargeHoraires(){          // réglages mémorisés d'une session à l'autre
     try {
       const o = JSON.parse(localStorage.getItem(CLE));
-      if (o && o.debut && o.dejeuner && o.reprise && o.depart) return o;
+      if (o && o.debut && o.dejeuner && o.reprise && o.depart){
+        if (typeof o.pause !== "boolean") o.pause = true;   // réglage ajouté après coup
+        return o;
+      }
     } catch { /* stockage indisponible : on repart des valeurs d'usine */ }
     return clone(DEF);
   }
@@ -477,8 +507,14 @@
           .forEach((el, i) => el.style.setProperty("--w", i + 1));
 
   /* --- horloge microseconde : Date.now() ancré sur performance.now() --- */
-  const anchorDate = Date.now(), anchorPerf = performance.now();
-  const nowUs = () => (anchorDate * 1000) + Math.round((performance.now() - anchorPerf) * 1000);
+  // Horloge : l'heure système locale, relue à CHAQUE frame. Pas d'ancrage figé au
+  // démarrage (qui pouvait dériver quand le téléphone se met en veille), pas d'UTC,
+  // pas de géoloc : new Date()/Date.now() suivent déjà le fuseau de l'appareil.
+  const nowUs = () => {
+    const ms = Date.now();                          // vérité : horloge locale (résolution ms)
+    const frac = performance.now();                 // sous-milliseconde, pour animer les µs
+    return ms * 1000 + Math.floor((frac - Math.floor(frac)) * 1000);
+  };
 
   /* --- jalons de la journée --- */
   let A = null;                       // jalons du jour en cours, en ms
@@ -501,12 +537,17 @@
     // clamp au cas où l'utilisateur saisit des horaires dans le désordre.
     const span = Math.max(1, A.dep - A.debut);
     const pos = ms => Math.max(0, Math.min(100, (ms - A.debut) / span * 100)) + "%";
-    $("band").style.left  = pos(A.dej);
-    $("band").style.width = Math.max(0, Math.min(100, (A.rep - A.dej) / span * 100)) + "%";
     $("k1").textContent = hhmm(A.debut);
     $("k4").textContent = hhmm(A.dep);
-    $("k2").textContent = hhmm(A.dej); $("k2").style.left = pos(A.dej);
-    $("k3").textContent = hhmm(A.rep); $("k3").style.left = pos(A.rep);
+    // sans pause : ni bande hachurée, ni étiquettes de pause
+    const vis = horaires.pause ? "" : "none";
+    $("band").style.display = $("k2").style.display = $("k3").style.display = vis;
+    if (horaires.pause){
+      $("band").style.left  = pos(A.dej);
+      $("band").style.width = Math.max(0, Math.min(100, (A.rep - A.dej) / span * 100)) + "%";
+      $("k2").textContent = hhmm(A.dej); $("k2").style.left = pos(A.dej);
+      $("k3").textContent = hhmm(A.rep); $("k3").style.left = pos(A.rep);
+    }
   }
 
   const hhmm = ms => { const d = new Date(ms); return pad(d.getHours(),2) + ":" + pad(d.getMinutes(),2); };
@@ -563,18 +604,20 @@
                     life:1, hue: hue + Math.random() * spread });
     }
   }
-  // teinte → rvb (saturation pleine), pour que le décor suive la couleur du palier
-  function hsl(h, l = .6){
-    const a = Math.min(l, 1 - l);
-    const f = n => { const k = (n + h / 30) % 12;
-                     return Math.round(255 * (l - a * Math.max(-1, Math.min(k - 3, 9 - k, 1)))); };
-    return [f(0), f(8), f(4)];
-  }
-  const teinteArc = () => (performance.now() / 5) % 360;   // le cycle arc-en-ciel
+  // Palette arc-en-ciel : 8 couleurs saturées à fond, dans l'ordre exact demandé.
+  // ROUGE, ORANGE, JAUNE, VERT, CYAN, INDIGO, VIOLET, ROSE — puis reboucle sur rouge.
+  const ARCPAL = [[255,0,0],[255,128,0],[255,224,0],[0,255,0],
+                  [0,255,255],[51,0,255],[180,0,255],[255,0,128]];
+  const arcColor = p => {                       // interpole la palette en boucle, p ∈ ℝ
+    const n = ARCPAL.length, f = (((p % 1) + 1) % 1) * n, i = Math.floor(f), t = f - i;
+    const a = ARCPAL[i % n], b = ARCPAL[(i + 1) % n];
+    return [a[0]+(b[0]-a[0])*t, a[1]+(b[1]-a[1])*t, a[2]+(b[2]-a[2])*t];
+  };
+  const arcPhase = () => performance.now() / 1150;   // même cadence que la vague CSS (1,15 s)
 
   function accent(){
     const c = document.body.classList;
-    if (c.contains("arc"))    return hsl(teinteArc());
+    if (c.contains("arc"))    return arcColor(arcPhase());
     if (c.contains("lunch"))  return [255, 138, 61];
     if (c.contains("free"))   return [59, 240, 122];
     if (c.contains("violet")) return [177, 77, 255];
@@ -663,12 +706,13 @@
     const b = document.body;
     if (new Date(now).getDate() !== jourAffiche) recale();   // minuit : on repart sur la journée suivante
 
-    // phase de la journée
-    if (now < A.debut)      phase = "avant";
-    else if (now < A.dej)   phase = "matin";
-    else if (now < A.rep)   phase = "pause";
-    else if (now < A.dep)   phase = "aprem";
-    else                    phase = "libre";
+    // phase de la journée (la pause peut être désactivée dans les réglages)
+    const pauseOn = horaires.pause;
+    if (now < A.debut)                phase = "avant";
+    else if (pauseOn && now < A.dej)  phase = "matin";
+    else if (pauseOn && now < A.rep)  phase = "pause";
+    else if (now < A.dep)             phase = pauseOn ? "aprem" : "jour";
+    else                              phase = "libre";
 
     const enPause = phase === "pause";
     // pendant la pause, le compte à rebours vise la reprise ; sinon, le départ
@@ -715,7 +759,7 @@
     }
     $("status").textContent = {
       avant: "avant l'embauche", matin: "matinée", pause: "pause repas",
-      aprem: "après-midi", libre: "heures supplémentaires"
+      aprem: "après-midi", jour: "journée en cours", libre: "heures supplémentaires"
     }[phase];
     $("targetLbl").textContent = enPause ? "reprise à " + hhmm(A.rep)
                                : phase === "libre" ? "départ passé à " + hhmm(A.dep)
@@ -740,14 +784,14 @@
     $("fill").style.width = (prog * 100).toFixed(3) + "%";
     $("cursor").style.left = (prog * 100).toFixed(3) + "%";
 
-    const pause = A.rep - A.dej;
+    const pause = pauseOn ? (A.rep - A.dej) : 0;
     const ecoule = Math.max(0, Math.min(now, A.dep) - A.debut);
-    const pausePrise = Math.max(0, Math.min(now, A.rep) - A.dej);
+    const pausePrise = pauseOn ? Math.max(0, Math.min(now, A.rep) - A.dej) : 0;
     const effectif = Math.max(0, ecoule - pausePrise);
     const totalTravail = span - pause;
 
     $("tPhase").textContent = { avant:"attente", matin:"matinée", pause:"repas",
-                                aprem:"après-midi", libre:"libéré" }[phase];
+                                aprem:"après-midi", jour:"en cours", libre:"libéré" }[phase];
     $("tWork").textContent = duree(effectif);
     $("tLeft").textContent = duree(totalTravail - effectif);
     $("tPct").textContent  = (prog * 100).toFixed(2) + " %";
@@ -758,7 +802,7 @@
     } else if (phase === "libre"){
       $("kExtra").textContent = "heures sup";     // l'info survit, le compteur géant non
       $("tExtra").textContent = duree(now - A.dep);
-    } else if (phase === "matin" || phase === "avant"){
+    } else if (pauseOn && (phase === "matin" || phase === "avant")){
       $("kExtra").textContent = "pause repas";
       $("tExtra").textContent = "dans " + duree(A.dej - now);
     } else {
@@ -784,6 +828,7 @@
       const faim = 1 + (1 - Math.min(1, secLeft / (pause / 1000))) * 2.6;
       ctx.fillStyle = "#FFFFFF";   // sinon les emoji héritent du voile de fond
       ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.globalAlpha = .18;       // en fond, discrets : ils ne concurrencent pas le burger et le texte
       for (const f of food){
         f.y += f.vy * (reduce ? .3 : 1) * faim;
         f.rot += f.vr * faim;
@@ -794,6 +839,7 @@
         ctx.fillText(f.ch, 0, 0);
         ctx.restore();
       }
+      ctx.globalAlpha = 1;
     } else {
       const warp = alerte === "arc";                 // hyperespace RGB sur les 10 dernières secondes
       const urgence = over ? 5 : Math.max(.35, Math.min(4.5, 90 / Math.max(secLeft, 3)));
@@ -807,8 +853,9 @@
         const pz = Math.min(st.z + speed * (warp ? 3 : 9), 1);
         const a = Math.min(1, (1 - st.z) * 1.1);
         if (warp){
-          const [hr, hg, hb] = hsl((st.h + teinteArc() * 4) % 360, .62);
-          ctx.strokeStyle = `rgba(${hr},${hg},${hb},${a})`;
+          // chaque étoile prend une couleur de la palette, décalée par son offset
+          const [hr, hg, hb] = arcColor(arcPhase() + st.h / 360);
+          ctx.strokeStyle = `rgba(${hr|0},${hg|0},${hb|0},${a})`;
           ctx.lineWidth = Math.max(1.5, (1 - st.z) * 3.6) * dpr;
         } else {
         ctx.strokeStyle = `rgba(${r},${g2},${bl},${a * .85})`;
@@ -850,9 +897,12 @@
 
   /* --- menu de réglages --- */
   const CHAMPS = { hDebut: "debut", hDej: "dejeuner", hRep: "reprise", hDep: "depart" };
-  function syncMenu(){                          // reflète les horaires courants dans les champs
+  function syncMenu(){                          // reflète les réglages courants dans le panneau
     for (const [id, key] of Object.entries(CHAMPS))
       $(id).value = pad(horaires[key][0], 2) + ":" + pad(horaires[key][1], 2);
+    $("pauseOn").checked = horaires.pause;
+    $("pauseFields").classList.toggle("off", !horaires.pause);
+    $("hDej").disabled = $("hRep").disabled = !horaires.pause;
   }
   for (const [id, key] of Object.entries(CHAMPS)){
     $(id).addEventListener("change", () => {
@@ -864,6 +914,11 @@
       recale();
     });
   }
+  $("pauseOn").addEventListener("change", () => {
+    horaires.pause = $("pauseOn").checked;
+    sauveHoraires();
+    recale();
+  });
   $("reset").addEventListener("click", () => {
     horaires = clone(DEF);
     sauveHoraires();
