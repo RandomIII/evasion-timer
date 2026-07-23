@@ -35,8 +35,8 @@ jobs:
 
       - name: Configurer Pages
         uses: actions/configure-pages@v5
-        with:
-          enablement: true      # active Pages automatiquement au premier passage
+        # Pages doit être activé une fois à la main : Settings → Pages → Source = GitHub Actions.
+        # (Le jeton du workflow n'a pas le droit de l'activer lui-même.)
 
       - name: Empaqueter le site
         uses: actions/upload-pages-artifact@v3
