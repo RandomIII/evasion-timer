@@ -1,0 +1,831 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Compte a rebours d'evasion</title>
+<style>*{box-sizing:border-box}html,body{margin:0;padding:0}</style>
+</head>
+<body><title>Compte à rebours d'évasion</title>
+<meta name="theme-color" content="#04050A">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Évasion">
+<link rel="apple-touch-icon" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" fill="%2304050A"/><circle cx="32" cy="32" r="21" fill="none" stroke="%2300E5FF" stroke-width="6"/><path d="M32 32V18M32 32l11 6" stroke="%23E6ECF7" stroke-width="5" stroke-linecap="round"/></svg>'>
+<link rel="manifest" href='data:application/manifest+json,{"name":"Compte à rebours d évasion","short_name":"Évasion","display":"standalone","orientation":"any","background_color":"%2304050A","theme_color":"%2304050A","start_url":".","icons":[{"src":"data:image/svg%2Bxml,<svg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 64 64%27><rect width=%2764%27 height=%2764%27 fill=%27%2304050A%27/><circle cx=%2732%27 cy=%2732%27 r=%2721%27 fill=%27none%27 stroke=%27%2300E5FF%27 stroke-width=%276%27/></svg>","sizes":"any","type":"image/svg+xml","purpose":"any"}]}'>
+<style>
+  :root{
+    --void:#04050A;
+    --cyan:#00E5FF;
+    --magenta:#FF2D78;
+    --amber:#FFB020;
+    --ink:#E6ECF7;
+    --dim:#5C6784;
+    --glow: var(--cyan);
+    --u: clamp(24px, 7.4vw, 84px);
+    --dh: calc(var(--u) * 1.62);
+    --dw: calc(var(--u) * 0.98);
+    --t:  calc(var(--u) * 0.155);
+    --mono: "Consolas","SF Mono",ui-monospace,"DejaVu Sans Mono",monospace;
+    --cond: "Haettenschweiler","Arial Narrow","Impact","Segoe UI",sans-serif;
+    --ui: "Segoe UI",system-ui,sans-serif;
+  }
+
+  html,body{height:100%;}
+  body{
+    margin:0;background:var(--void);color:var(--ink);
+    font-family:var(--ui);overflow:hidden;-webkit-font-smoothing:antialiased;
+  }
+
+  #warp{position:fixed;inset:0;width:100%;height:100%;display:block;}
+  .vignette{
+    position:fixed;inset:0;pointer-events:none;
+    background:radial-gradient(ellipse at 50% 45%, rgba(0,0,0,0) 30%, rgba(2,3,8,.75) 78%, #02030899 100%);
+  }
+  .scan{
+    position:fixed;inset:0;pointer-events:none;opacity:.22;
+    background:repeating-linear-gradient(to bottom, rgba(255,255,255,.055) 0 1px, transparent 1px 3px);
+    mix-blend-mode:overlay;
+  }
+
+  .stage{
+    position:relative;min-height:100dvh;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:clamp(10px,2vh,24px);padding:clamp(14px,2.6vh,34px) 18px;box-sizing:border-box;
+  }
+
+  /* ---------- étiquettes ---------- */
+  .eyebrow{
+    font-family:var(--cond);text-transform:uppercase;letter-spacing:.4em;
+    font-size:clamp(11px,1.5vw,15px);color:var(--dim);
+    display:flex;align-items:center;gap:.9em;text-align:center;
+  }
+  .eyebrow b{color:var(--glow);font-weight:400;text-shadow:0 0 14px var(--glow);}
+  .dot{
+    width:7px;height:7px;background:var(--glow);border-radius:50%;
+    box-shadow:0 0 12px var(--glow);animation:pulse 1s steps(2,end) infinite;
+  }
+  @keyframes pulse{0%,49%{opacity:1}50%,100%{opacity:.15}}
+
+  /* ---------- afficheur 7 segments ---------- */
+  .readout{display:flex;align-items:flex-start;gap:calc(var(--u)*.30);}
+  .grp{display:flex;flex-direction:column;align-items:center;gap:calc(var(--u)*.20);}
+  .digits{display:flex;gap:calc(var(--u)*.14);}
+  .cap{font-family:var(--cond);text-transform:uppercase;letter-spacing:.32em;
+       font-size:clamp(9px,1.1vw,13px);color:var(--dim);}
+  .colon{position:relative;width:calc(var(--u)*.30);height:var(--dh);
+         animation:blink 1s steps(2,end) infinite;}
+  .colon i{position:absolute;left:12%;width:76%;aspect-ratio:1;border-radius:2px;
+           background:var(--glow);box-shadow:0 0 calc(var(--u)*.30) var(--glow);}
+  .colon i:first-child{top:28%}
+  .colon i:last-child{top:60%}
+  @keyframes blink{0%,55%{opacity:1}56%,100%{opacity:.12}}
+
+  .d7{position:relative;width:var(--dw);height:var(--dh);}
+  .d7 s{position:absolute;display:block;background:var(--glow);
+        opacity:.055;transition:opacity .07s linear, box-shadow .07s linear;}
+  .d7 s.on{opacity:1;box-shadow:0 0 calc(var(--u)*.34) color-mix(in srgb, var(--glow) 70%, transparent);}
+  .d7 .h{left:var(--t);width:calc(var(--dw) - var(--t)*2);height:var(--t);
+         clip-path:polygon(0 50%,14% 0,86% 0,100% 50%,86% 100%,14% 100%);}
+  .d7 .v{width:var(--t);height:calc(var(--dh)/2 - var(--t)*1.5);
+         clip-path:polygon(50% 0,100% 14%,100% 86%,50% 100%,0 86%,0 14%);}
+  .d7 .a{top:0}
+  .d7 .g{left:var(--t);width:calc(var(--dw) - var(--t)*2);height:var(--t);
+         top:calc(var(--dh)/2 - var(--t)/2);
+         clip-path:polygon(0 50%,10% 0,90% 0,100% 50%,90% 100%,10% 100%);}
+  .d7 .d{bottom:0}
+  .d7 .b{right:0;top:var(--t)}
+  .d7 .c{right:0;top:calc(var(--dh)/2 + var(--t)*.5)}
+  .d7 .f{left:0;top:var(--t)}
+  .d7 .e{left:0;top:calc(var(--dh)/2 + var(--t)*.5)}
+
+  /* ---------- sous-secondes ---------- */
+  .sub{display:flex;align-items:baseline;gap:1.1ch;
+       font-family:var(--mono);font-variant-numeric:tabular-nums;
+       font-size:clamp(18px,3.8vw,44px);letter-spacing:.02em;}
+  .ms{color:var(--glow);text-shadow:0 0 26px color-mix(in srgb,var(--glow) 60%,transparent);}
+  .us{color:var(--magenta);opacity:.85;filter:blur(.35px);
+      text-shadow:0 0 22px color-mix(in srgb,var(--magenta) 55%,transparent);}
+  .sub small{font-family:var(--cond);letter-spacing:.3em;
+             font-size:clamp(9px,1.1vw,12px);color:var(--dim);}
+
+  /* ---------- frise de journée ---------- */
+  .day{width:min(880px,92vw);display:flex;flex-direction:column;gap:6px;}
+  .track{height:14px;background:#0D1220;border:1px solid #18203A;position:relative;overflow:hidden;}
+  .band{                                   /* zone déjeuner, par-dessus le remplissage */
+    position:absolute;top:0;bottom:0;z-index:2;
+    background:repeating-linear-gradient(115deg,rgba(12,6,2,.62) 0 7px,rgba(255,138,61,.34) 7px 15px);
+    border-left:1px solid rgba(255,138,61,.75);border-right:1px solid rgba(255,138,61,.75);
+  }
+  .fill{
+    position:absolute;top:0;bottom:0;left:0;z-index:1;
+    background:linear-gradient(90deg,color-mix(in srgb,var(--glow) 30%,#0D1220),var(--glow));
+    box-shadow:0 0 22px color-mix(in srgb,var(--glow) 45%,transparent);
+    transition:width .12s linear;
+  }
+  .cursor{position:absolute;top:-4px;bottom:-4px;width:3px;z-index:3;background:var(--ink);
+          box-shadow:0 0 12px var(--ink);transition:left .12s linear;}
+  /* étiquettes calées sur leur vraie abscisse dans la frise, pas réparties à l'aveugle */
+  .ticks{position:relative;height:15px;
+         font-family:var(--mono);font-size:11px;color:var(--dim);}
+  .ticks span{position:absolute;top:0;transform:translateX(-50%);white-space:nowrap;}
+  .ticks span:first-child{left:0;transform:none;}
+  .ticks span:last-child{left:100%;transform:translateX(-100%);}
+  .ticks .repas{color:#FF8A3D;}
+
+  /* ---------- télémétrie ---------- */
+  .telemetry{
+    width:min(880px,92vw);
+    display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));
+    gap:1px;background:#141B2E;border:1px solid #141B2E;
+  }
+  .cell{background:#070A13;padding:8px 12px;display:flex;flex-direction:column;gap:4px;}
+  .cell .k{font-family:var(--cond);text-transform:uppercase;letter-spacing:.22em;font-size:10px;color:var(--dim);}
+  .cell .v{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:14px;color:var(--ink);}
+
+  /* ---------- console ---------- */
+  .console{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:8px;width:min(880px,92vw);}
+  input[type=time]{font-family:var(--mono);font-size:16px;color:var(--ink);
+                   background:#070A13;border:1px solid #222C4A;padding:8px 11px;color-scheme:dark;}
+  input[type=time]:focus-visible,button:focus-visible{outline:2px solid var(--glow);outline-offset:2px;}
+  button{font-family:var(--cond);text-transform:uppercase;letter-spacing:.18em;font-size:13px;
+         color:var(--ink);background:#070A13;border:1px solid #222C4A;padding:10px 13px;cursor:pointer;
+         transition:background .12s,border-color .12s,color .12s;}
+  button:hover{background:#0F1626;border-color:var(--glow);color:var(--glow);}
+  button.go{border-color:var(--glow);color:var(--glow);}
+  button.go:hover{background:var(--glow);color:var(--void);}
+  button[aria-pressed=true]{background:var(--glow);color:var(--void);border-color:var(--glow);}
+
+  /* ---------- états ---------- */
+  /* paliers : 1h jaune · 15 min orange · 5 min rouge · 1 min violet · 10 s arc-en-ciel */
+  body.jaune{--glow:#FFE34A;--magenta:#FFC24A;}
+  body.orange{--glow:#FF9A1F;--magenta:#FFB86A;}
+  body.rouge{--glow:#FF3B2F;--magenta:#FF8A6A;}
+  body.rouge .stage{animation:shake .09s infinite;}
+  body.violet{--glow:#B14DFF;--magenta:#F06BFF;}
+  body.violet .stage{animation:shakeFast .05s infinite;}
+
+  body.arc{--glow:#FF0066;--magenta:#FF0066;}
+  body.arc .stage{animation:shakeWild .07s infinite;}
+  /* vague RGB : un même cycle, décalé bloc par bloc — le principe du clavier gamer */
+  body.arc .eyebrow, body.arc .sub, body.arc .day, body.arc .telemetry,
+  body.arc .console, body.arc .d7, body.arc .colon{
+    animation:arcenciel 1.4s linear infinite;
+    animation-delay:calc(var(--w,0) * -.075s);
+  }
+  body.arc .eyebrow{--w:0}  body.arc .sub{--w:9}      body.arc .day{--w:11}
+  body.arc .telemetry{--w:13}  body.arc .console{--w:15}
+  @keyframes arcenciel{from{filter:hue-rotate(0deg)}to{filter:hue-rotate(360deg)}}
+  @keyframes shakeWild{
+    0%  {transform:translate(0,0)       rotate(0deg)}
+    14% {transform:translate(-10px,7px)  rotate(-1.1deg)}
+    28% {transform:translate(9px,-8px)   rotate(1deg)}
+    42% {transform:translate(-7px,-6px)  rotate(1.2deg)}
+    57% {transform:translate(10px,8px)   rotate(-.9deg)}
+    71% {transform:translate(-9px,4px)   rotate(.8deg)}
+    85% {transform:translate(6px,-10px)  rotate(-1.2deg)}
+    100%{transform:translate(0,0)       rotate(0deg)}
+  }
+  @keyframes shake{
+    0%{transform:translate(0,0)}25%{transform:translate(1.5px,-1px)}
+    50%{transform:translate(-1px,1.5px)}75%{transform:translate(-1.5px,-1px)}
+    100%{transform:translate(1px,1px)}
+  }
+  @keyframes shakeFast{
+    0%{transform:translate(0,0) rotate(0deg)}
+    20%{transform:translate(6px,-5px) rotate(.3deg)}
+    40%{transform:translate(-7px,4px) rotate(-.3deg)}
+    60%{transform:translate(5px,6px) rotate(.2deg)}
+    80%{transform:translate(-5px,-6px) rotate(-.2deg)}
+    100%{transform:translate(0,0) rotate(0deg)}
+  }
+  body.free{--glow:#3BF07A;}
+
+  /* ---------- pause repas ---------- */
+  body.lunch{--glow:#FF8A3D;--magenta:#FFD24A;}
+  body.lunch .vignette{
+    background:radial-gradient(ellipse at 50% 42%, rgba(255,138,61,.16) 0%, rgba(0,0,0,0) 45%),
+               radial-gradient(ellipse at 50% 45%, rgba(0,0,0,0) 30%, rgba(10,4,2,.78) 78%, #0A0402 100%);
+  }
+  body.lunch .us{filter:none;opacity:.95;}
+
+  .banner{
+    font-family:var(--cond);text-transform:uppercase;letter-spacing:.3em;
+    font-size:clamp(16px,3.4vw,36px);color:var(--glow);text-shadow:0 0 40px var(--glow);
+    height:0;overflow:visible;opacity:0;transition:opacity .3s;white-space:nowrap;
+  }
+  body.lunch .banner{opacity:1;}
+
+  /* la libération : le mot remplace le compteur, compter ses heures sup serait le contraire du message */
+  .libre{
+    display:none;font-family:var(--cond);text-transform:uppercase;font-weight:800;
+    font-size:clamp(72px,20vw,280px);line-height:.9;letter-spacing:.04em;
+    color:var(--glow);text-shadow:0 0 50px var(--glow),0 0 160px var(--glow);
+  }
+  body.free .libre{display:flex;animation:respire 2.8s ease-in-out infinite;}
+  body.free .readout,body.free .sub{display:none;}
+  .libre span{animation:tombe .55s cubic-bezier(.2,1.7,.4,1) backwards;}
+  .libre span:nth-child(2){animation-delay:.07s}
+  .libre span:nth-child(3){animation-delay:.14s}
+  .libre span:nth-child(4){animation-delay:.21s}
+  .libre span:nth-child(5){animation-delay:.28s}
+  @keyframes tombe{from{transform:translateY(-.3em) scale(.75);opacity:0}
+                   to{transform:none;opacity:1}}
+  @keyframes respire{0%,100%{transform:scale(1)}50%{transform:scale(1.025)}}
+
+  /* ---------- le hamburger qui se monte ---------- */
+  .burger{
+    display:none;flex-direction:column-reverse;align-items:center;
+    width:clamp(120px,17vw,190px);height:clamp(96px,15vh,150px);justify-content:flex-start;
+    filter:drop-shadow(0 10px 26px rgba(255,138,61,.35));
+  }
+  body.lunch .burger{display:flex;}
+  .burger i{display:block;width:100%;animation:plop .5s cubic-bezier(.2,1.5,.4,1) backwards;}
+  @keyframes plop{
+    from{transform:translateY(-90px) scaleX(.7);opacity:0}
+    60%{transform:translateY(4px) scaleX(1.06);opacity:1}
+    to{transform:translateY(0) scaleX(1);opacity:1}
+  }
+  .l-bunb{height:20%;background:linear-gradient(#D89550,#A96A32);
+          border-radius:0 0 46% 46% / 0 0 100% 100%;}
+  .l-steak{height:17%;background:linear-gradient(#7A4426,#4A2513);border-radius:7px;width:104%;}
+  .l-cheese{height:9%;background:linear-gradient(#FFC93C,#EFA415);width:106%;
+            clip-path:polygon(0 0,100% 0,100% 55%,88% 100%,72% 55%,52% 100%,34% 55%,16% 100%,0 55%);}
+  .l-salad{height:9%;background:#63BE38;width:108%;
+           clip-path:polygon(0 0,100% 0,100% 40%,92% 100%,80% 40%,66% 100%,52% 40%,38% 100%,24% 40%,10% 100%,0 40%);}
+  .l-tomato{height:9%;background:linear-gradient(#E8452F,#B8261A);border-radius:5px;width:102%;}
+  .l-onion{height:6%;background:#F3E6EC;border-radius:5px;width:100%;opacity:.9;}
+  .l-bacon{height:8%;background:repeating-linear-gradient(92deg,#C7452B 0 9px,#F0C9B6 9px 13px);
+           border-radius:4px;width:104%;}
+  .l-bunt{height:34%;background:radial-gradient(circle at 30% 65%,#F3E3C0 0 3px,transparent 3px),
+                    radial-gradient(circle at 55% 45%,#F3E3C0 0 3px,transparent 3px),
+                    radial-gradient(circle at 72% 70%,#F3E3C0 0 3px,transparent 3px),
+                    linear-gradient(#E5A45C,#C07C39);
+          border-radius:50% 50% 14% 14% / 100% 100% 22% 22%;}
+
+  /* ---------- téléphone : horaires figés, plus aucune commande ---------- */
+  @media (max-width:720px){
+    :root{--u:clamp(30px,10.5vw,58px);}
+    .stage{
+      gap:clamp(8px,1.6vh,16px);
+      padding:calc(14px + env(safe-area-inset-top)) 12px calc(14px + env(safe-area-inset-bottom));
+    }
+    .console{display:none;}                       /* réglage automatique, rien à toucher */
+    .eyebrow{letter-spacing:.26em;font-size:10px;flex-wrap:wrap;justify-content:center;}
+    .sub{font-size:clamp(16px,6.5vw,30px);}
+    .telemetry{grid-template-columns:repeat(2,1fr);}
+    .cell{padding:7px 10px;}
+    .cell .k{font-size:9px;letter-spacing:.18em;}
+    .cell .v{font-size:13px;}
+    .ticks{font-size:10px;height:14px;}
+    .libre{font-size:clamp(56px,21vw,150px);}
+    .burger{width:clamp(96px,26vw,140px);height:clamp(78px,12vh,120px);}
+    .banner{font-size:clamp(15px,5vw,26px);letter-spacing:.24em;}
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    body.rouge .stage,body.violet .stage,body.arc .stage{animation:none}
+    .dot,.colon,.burger i{animation:none}
+  }
+</style>
+
+<canvas id="warp"></canvas>
+<div class="vignette"></div>
+<div class="scan"></div>
+
+<main class="stage">
+  <div class="eyebrow"><span class="dot"></span><span id="status">journée en cours</span> — <b id="targetLbl">--:--</b></div>
+
+  <div class="banner" id="banner">Pause repas</div>
+  <div class="burger" id="burger"></div>
+
+  <div class="libre"><span>L</span><span>I</span><span>B</span><span>R</span><span>E</span></div>
+
+  <div class="readout">
+    <div class="grp"><div class="digits" id="dH"></div><div class="cap">heures</div></div>
+    <div class="colon"><i></i><i></i></div>
+    <div class="grp"><div class="digits" id="dM"></div><div class="cap">minutes</div></div>
+    <div class="colon"><i></i><i></i></div>
+    <div class="grp"><div class="digits" id="dS"></div><div class="cap">secondes</div></div>
+  </div>
+
+  <div class="sub">
+    <span class="ms" id="ms">000</span><small>ms</small>
+    <span class="us" id="us">000</span><small>µs</small>
+  </div>
+
+  <div class="day">
+    <div class="track">
+      <div class="band" id="band"></div>
+      <div class="fill" id="fill" style="width:0%"></div>
+      <div class="cursor" id="cursor" style="left:0%"></div>
+    </div>
+    <div class="ticks">
+      <span id="k1">08:30</span><span class="repas" id="k2">12:00</span><span class="repas" id="k3">13:00</span><span id="k4">16:30</span>
+    </div>
+  </div>
+
+  <div class="telemetry">
+    <div class="cell"><span class="k">phase</span><span class="v" id="tPhase">—</span></div>
+    <div class="cell"><span class="k">travail effectif</span><span class="v" id="tWork">—</span></div>
+    <div class="cell"><span class="k">reste à tirer</span><span class="v" id="tLeft">—</span></div>
+    <div class="cell"><span class="k">journée</span><span class="v" id="tPct">—</span></div>
+    <div class="cell"><span class="k" id="kExtra">prochaine pause</span><span class="v" id="tExtra">—</span></div>
+    <div class="cell"><span class="k">rafraîchissement</span><span class="v" id="tFps">—</span></div>
+  </div>
+
+  <div class="console">
+    <input type="time" id="when" step="60" aria-label="Heure de départ" />
+    <button class="go" id="arm">Recaler</button>
+    <button data-add="5">+5 min</button>
+    <button data-add="15">+15 min</button>
+    <button data-add="-5">−5 min</button>
+    <button id="sound" aria-pressed="false">Son</button>
+    <button id="full">Plein écran</button>
+  </div>
+</main>
+
+<script>
+(() => {
+  "use strict";
+
+  /* ============ horaires de la journée — modifie ici ============ */
+  const JOUR = {
+    debut:    [8, 30],   // arrivée
+    dejeuner: [12, 0],   // début de la pause repas
+    reprise:  [13, 0],   // fin de la pause repas
+    depart:   [16, 30]   // libération
+  };
+  /* Paliers d'urgence avant le départ, du plus lointain au plus proche.
+     Le premier dont le seuil est atteint gagne, d'où l'ordre décroissant.        */
+  const SEUILS = [
+    { classe: "jaune",   sec: 60 * 60 },
+    { classe: "orange",  sec: 15 * 60 },
+    { classe: "rouge",   sec:  5 * 60 },
+    { classe: "violet",  sec:      60 },
+    { classe: "arc",     sec:      10 }
+  ];
+  /* ============================================================== */
+
+  const $ = id => document.getElementById(id);
+  const pad = (n, w) => String(n).padStart(w, "0");
+  const SEGMAP = {
+    0:"abcdef", 1:"bc", 2:"abged", 3:"abgcd", 4:"fgbc",
+    5:"afgcd", 6:"afgedc", 7:"abc", 8:"abcdefg", 9:"abfgcd"
+  };
+
+  /* --- fabrique d'afficheurs 7 segments --- */
+  function buildDigits(host, count){
+    const cells = [];
+    for (let i = 0; i < count; i++){
+      const d = document.createElement("div");
+      d.className = "d7";
+      const segs = {};
+      for (const s of "abcdefg"){
+        const el = document.createElement("s");
+        el.className = s + " " + ("adg".includes(s) ? "h" : "v");
+        d.appendChild(el); segs[s] = el;
+      }
+      host.appendChild(d);
+      cells.push({ segs, last: null });
+    }
+    return cells;
+  }
+  function setDigits(cells, value){
+    const str = String(value).padStart(cells.length, "0").slice(-cells.length);
+    for (let i = 0; i < cells.length; i++){
+      if (cells[i].last === str[i]) continue;
+      cells[i].last = str[i];
+      const on = SEGMAP[str[i]] || "";
+      for (const s of "abcdefg") cells[i].segs[s].classList.toggle("on", on.includes(s));
+    }
+  }
+  const H = buildDigits($("dH"), 2), M = buildDigits($("dM"), 2), S = buildDigits($("dS"), 2);
+
+  // rang de chaque élément dans la vague RGB, de gauche à droite (querySelectorAll suit l'ordre du DOM)
+  document.querySelectorAll(".readout .d7, .readout .colon")
+          .forEach((el, i) => el.style.setProperty("--w", i + 1));
+
+  /* --- horloge microseconde : Date.now() ancré sur performance.now() --- */
+  const anchorDate = Date.now(), anchorPerf = performance.now();
+  const nowUs = () => (anchorDate * 1000) + Math.round((performance.now() - anchorPerf) * 1000);
+
+  /* --- jalons de la journée --- */
+  let depart = JOUR.depart.slice();   // modifiable via la console
+  let A = null;                       // jalons du jour en cours, en ms
+
+  function anchorsFor(day){
+    const mk = ([h, m]) => { const d = new Date(day); d.setHours(h, m, 0, 0); return d.getTime(); };
+    return { debut: mk(JOUR.debut), dej: mk(JOUR.dejeuner), rep: mk(JOUR.reprise), dep: mk(depart) };
+  }
+  function recale(){
+    // toujours la journée en cours : rouvrir la fenêtre à 17h doit afficher LIBRE,
+    // pas basculer sur demain. Le passage de minuit est géré dans la boucle.
+    A = anchorsFor(new Date());
+    jourAffiche = new Date().getDate();
+    freed = false; lastSecond = -1;
+    document.body.classList.remove("free");
+    $("when").value = pad(depart[0], 2) + ":" + pad(depart[1], 2);
+
+    // frise : la bande et ses étiquettes partagent la même échelle
+    const span = A.dep - A.debut;
+    const pos = ms => ((ms - A.debut) / span * 100) + "%";
+    $("band").style.left  = pos(A.dej);
+    $("band").style.width = ((A.rep - A.dej) / span * 100) + "%";
+    $("k1").textContent = hhmm(A.debut);
+    $("k4").textContent = hhmm(A.dep);
+    $("k2").textContent = hhmm(A.dej); $("k2").style.left = pos(A.dej);
+    $("k3").textContent = hhmm(A.rep); $("k3").style.left = pos(A.rep);
+  }
+
+  const hhmm = ms => { const d = new Date(ms); return pad(d.getHours(),2) + ":" + pad(d.getMinutes(),2); };
+  const duree = ms => {
+    const s = Math.max(0, Math.floor(ms / 1000));
+    return pad(Math.floor(s / 3600), 1) + "h" + pad(Math.floor(s / 60) % 60, 2);
+  };
+
+  let freed = false, lastSecond = -1, phase = "", lastPhase = "", lastAlerte = "", jourAffiche = -1;
+
+  /* --- son --- */
+  let ac = null, soundOn = false;
+  function chirp(freq, dur, type = "square", vol = .05){
+    if (!soundOn) return;
+    ac = ac || new (window.AudioContext || window.webkitAudioContext)();
+    const o = ac.createOscillator(), g = ac.createGain();
+    o.type = type; o.frequency.value = freq;
+    g.gain.setValueAtTime(vol, ac.currentTime);
+    g.gain.exponentialRampToValueAtTime(.0001, ac.currentTime + dur);
+    o.connect(g).connect(ac.destination);
+    o.start(); o.stop(ac.currentTime + dur);
+  }
+  const air = notes => notes.forEach((f, i) => setTimeout(() => chirp(f, .3, "triangle", .07), i * 130));
+
+  /* --- décor : warp la journée, pluie de bouffe à midi --- */
+  const cv = $("warp"), ctx = cv.getContext("2d");
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const MENU = ["🍔","🍟","🌭","🍕","🥐","🧀","🥖","☕","🍎","🥗","🍩","🥓"];
+  let W = 0, Hh = 0, dpr = 1, stars = [], food = [], bursts = [];
+
+  function resize(){
+    dpr = Math.min(devicePixelRatio || 1, 2);
+    W = cv.width = innerWidth * dpr; Hh = cv.height = innerHeight * dpr;
+    cv.style.width = innerWidth + "px"; cv.style.height = innerHeight + "px";
+  }
+  const seedStar = z => ({ x:(Math.random()-.5)*2, y:(Math.random()-.5)*2,
+                           z: z ?? Math.random(), h: Math.random() * 360 });
+  const seedFood = top => ({
+    x: Math.random() * W, y: top ? -80 * dpr : Math.random() * Hh,
+    vy: (Math.random() * .9 + .5) * dpr, rot: Math.random() * 6.3,
+    vr: (Math.random() - .5) * .04, size: (Math.random() * 26 + 22) * dpr,
+    ch: MENU[(Math.random() * MENU.length) | 0]
+  });
+  addEventListener("resize", resize);
+  resize();                                    // dimensionner AVANT de semer : seedFood a besoin de W et Hh
+  const NB_ETOILES = innerWidth < 720 ? 220 : 460;   // moins de traits à tracer sur un téléphone
+  for (let i = 0; i < NB_ETOILES; i++) stars.push(seedStar());
+  for (let i = 0; i < 46; i++) food.push(seedFood(false));
+
+  function burst(hue, spread){
+    for (let i = 0; i < 260; i++){
+      const a = Math.random() * Math.PI * 2, sp = (Math.random() ** 2) * 16 + 2;
+      bursts.push({ x:W/2, y:Hh/2, vx:Math.cos(a)*sp*dpr, vy:Math.sin(a)*sp*dpr,
+                    life:1, hue: hue + Math.random() * spread });
+    }
+  }
+  // teinte → rvb (saturation pleine), pour que le décor suive la couleur du palier
+  function hsl(h, l = .6){
+    const a = Math.min(l, 1 - l);
+    const f = n => { const k = (n + h / 30) % 12;
+                     return Math.round(255 * (l - a * Math.max(-1, Math.min(k - 3, 9 - k, 1)))); };
+    return [f(0), f(8), f(4)];
+  }
+  const teinteArc = () => (performance.now() / 5) % 360;   // le cycle arc-en-ciel
+
+  function accent(){
+    const c = document.body.classList;
+    if (c.contains("arc"))    return hsl(teinteArc());
+    if (c.contains("lunch"))  return [255, 138, 61];
+    if (c.contains("free"))   return [59, 240, 122];
+    if (c.contains("violet")) return [177, 77, 255];
+    if (c.contains("rouge"))  return [255, 59, 47];
+    if (c.contains("orange")) return [255, 154, 31];
+    if (c.contains("jaune"))  return [255, 227, 74];
+    return [0, 229, 255];
+  }
+
+  /* --- le feu : braises rouges à 5 min, enfer violet à 1 min, chaos à 10 s --- */
+  const flammes = [];
+  // usure : monter la vitesse sans monter l'usure ferait grimper les flammes plus haut.
+  // Les deux vont de pair, donc la hauteur reste la même et seul le débit change.
+  function attise(n, hueBase, hueSpread, force, taille, usure){
+    if (flammes.length > 900) return;
+    for (let i = 0; i < n; i++){
+      // cinq foyers qui se chevauchent : un semis uniforme donnerait un bandeau plat
+      const foyer = (Math.random() * 5) | 0;
+      flammes.push({
+        x: W * ((foyer + .5) / 5) + (Math.random() - .5) * (W / 5) * 1.7,
+        y: Hh + Math.random() * 12 * dpr,
+        vx: (Math.random() - .5) * .7 * dpr,
+        vy: -(Math.random() * 1.6 + 1.4) * force * dpr,
+        seed: Math.random() * 6.3,
+        size: (Math.random() * taille + taille * .6) * dpr,
+        decay: (.013 + Math.random() * .013) * usure,
+        hue: hueBase + Math.random() * hueSpread, life: 1
+      });
+    }
+  }
+  // une pastille floue par teinte, calculée une fois : un disque net ferait des bulles
+  const pastilles = {};
+  function pastille(hue){
+    const k = Math.round(hue / 8) * 8;
+    if (pastilles[k]) return pastilles[k];
+    const c = document.createElement("canvas");
+    c.width = c.height = 64;
+    const g = c.getContext("2d");
+    const gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+    gr.addColorStop(0,  `hsla(${k},100%,78%,.90)`);
+    gr.addColorStop(.3, `hsla(${k},100%,58%,.40)`);
+    gr.addColorStop(1,  `hsla(${k},100%,45%,0)`);
+    g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
+    return pastilles[k] = c;
+  }
+
+  function brule(){
+    if (!flammes.length) return;
+    ctx.globalCompositeOperation = "lighter";
+    for (let i = flammes.length - 1; i >= 0; i--){
+      const p = flammes[i];
+      p.x += p.vx + Math.sin(p.y * .012 + p.seed) * .8 * dpr;
+      p.y += p.vy;
+      p.vy *= 1.012;                       // la flamme s'étire en montant
+      p.life -= p.decay;
+      if (p.life <= 0){ flammes.splice(i, 1); continue; }
+      const d = p.size * (.35 + p.life * .65) * 2.4;
+      ctx.globalAlpha = p.life * .6;
+      ctx.drawImage(pastille(p.hue), p.x - d / 2, p.y - d / 2, d, d);
+    }
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = "source-over";
+  }
+
+  /* --- le hamburger : une couche toutes les 15 minutes de pause --- */
+  const COUCHES = ["l-bunb","l-steak","l-cheese","l-salad","l-tomato","l-onion","l-bacon","l-bunt"];
+  let couchesPosees = -1;
+  function majBurger(n){
+    if (n === couchesPosees) return;
+    const host = $("burger");
+    if (n < couchesPosees){ host.textContent = ""; couchesPosees = 0; }
+    for (let i = couchesPosees < 0 ? 0 : couchesPosees; i < n; i++){
+      const el = document.createElement("i");
+      el.className = COUCHES[i];
+      host.appendChild(el);
+      if (couchesPosees >= 0) chirp(180 + i * 40, .12, "sine", .05);
+    }
+    couchesPosees = n;
+  }
+
+  /* --- boucle --- */
+  let frames = 0, fpsT = performance.now();
+  function loop(){
+    requestAnimationFrame(loop);
+    const t = nowUs(), now = t / 1000;
+    const b = document.body;
+    if (new Date(now).getDate() !== jourAffiche) recale();   // minuit : on repart sur la journée suivante
+
+    // phase de la journée
+    if (now < A.debut)      phase = "avant";
+    else if (now < A.dej)   phase = "matin";
+    else if (now < A.rep)   phase = "pause";
+    else if (now < A.dep)   phase = "aprem";
+    else                    phase = "libre";
+
+    const enPause = phase === "pause";
+    // pendant la pause, le compte à rebours vise la reprise ; sinon, le départ
+    const cibleUs = (enPause ? A.rep : A.dep) * 1000;
+    const rem = cibleUs - t, over = rem < 0, abs = Math.abs(rem);
+
+    setDigits(H, Math.min(Math.floor(abs / 3.6e9), 99));
+    setDigits(M, Math.floor(abs / 6e7) % 60);
+    setDigits(S, Math.floor(abs / 1e6) % 60);
+    $("ms").textContent = pad(Math.floor(abs / 1e3) % 1000, 3);
+    $("us").textContent = pad(abs % 1000, 3);
+
+    // habillage selon la phase
+    const secLeft = rem / 1e6;
+    const secDep = (A.dep - now) / 1000;           // secondes avant le départ, seul juge de l'urgence
+    let alerte = "";
+    if (!enPause && phase !== "libre")
+      for (const s of SEUILS) if (secDep <= s.sec) alerte = s.classe;
+    b.classList.toggle("lunch", enPause);
+    for (const s of SEUILS) b.classList.toggle(s.classe, alerte === s.classe);
+    if (alerte !== lastAlerte){
+      ({ jaune:  () => air([523, 659]),
+         orange: () => air([440, 554]),
+         rouge:  () => air([392, 466, 587]),
+         violet: () => air([330, 415, 523, 622]),
+         arc:    () => air([262, 330, 392, 523, 659, 784])
+       }[alerte] || (() => {}))();
+      lastAlerte = alerte;
+    }
+
+    if (phase !== lastPhase){
+      if (lastPhase !== ""){
+        if (enPause){ burst(20, 45); air([392, 523, 659, 784]); }
+        else if (phase === "aprem"){ burst(200, 60); air([784, 659, 523]); }
+      }
+      lastPhase = phase;
+    }
+
+    if (phase === "libre" && !freed){
+      freed = true;
+      b.classList.add("free");
+      for (const s of SEUILS) b.classList.remove(s.classe);
+      burst(120, 70); air([523, 659, 784, 1046]);
+    }
+    $("status").textContent = {
+      avant: "avant l'embauche", matin: "matinée", pause: "pause repas",
+      aprem: "après-midi", libre: "heures supplémentaires"
+    }[phase];
+    $("targetLbl").textContent = enPause ? "reprise à " + hhmm(A.rep)
+                               : phase === "libre" ? "départ passé à " + hhmm(A.dep)
+                               : "départ à " + hhmm(A.dep);
+
+    // hamburger : 8 couches réparties sur la pause
+    majBurger(enPause ? Math.max(1, Math.ceil((now - A.dej) / (A.rep - A.dej) * 8)) : 0);
+
+    // bips
+    if (!over){
+      const sec = Math.ceil(secLeft);
+      if (sec !== lastSecond){
+        lastSecond = sec;
+        if (sec <= 10) chirp(sec <= 3 ? 1100 : 880, .05);
+        else if (sec % 60 === 0) chirp(enPause ? 330 : 440, .07);
+      }
+    }
+
+    // frise + télémétrie
+    const span = A.dep - A.debut;
+    const prog = Math.max(0, Math.min(1, (now - A.debut) / span));
+    $("fill").style.width = (prog * 100).toFixed(3) + "%";
+    $("cursor").style.left = (prog * 100).toFixed(3) + "%";
+
+    const pause = A.rep - A.dej;
+    const ecoule = Math.max(0, Math.min(now, A.dep) - A.debut);
+    const pausePrise = Math.max(0, Math.min(now, A.rep) - A.dej);
+    const effectif = Math.max(0, ecoule - pausePrise);
+    const totalTravail = span - pause;
+
+    $("tPhase").textContent = { avant:"attente", matin:"matinée", pause:"repas",
+                                aprem:"après-midi", libre:"libéré" }[phase];
+    $("tWork").textContent = duree(effectif);
+    $("tLeft").textContent = duree(totalTravail - effectif);
+    $("tPct").textContent  = (prog * 100).toFixed(2) + " %";
+
+    if (enPause){
+      $("kExtra").textContent = "burger";
+      $("tExtra").textContent = couchesPosees + "/8 couches";
+    } else if (phase === "libre"){
+      $("kExtra").textContent = "heures sup";     // l'info survit, le compteur géant non
+      $("tExtra").textContent = duree(now - A.dep);
+    } else if (phase === "matin" || phase === "avant"){
+      $("kExtra").textContent = "pause repas";
+      $("tExtra").textContent = "dans " + duree(A.dej - now);
+    } else {
+      $("kExtra").textContent = "cafés possibles";
+      $("tExtra").textContent = String(Math.max(0, Math.floor((A.dep - now) / 3e5)));
+    }
+
+    frames++;
+    if (performance.now() - fpsT > 500){
+      $("tFps").textContent = (frames / ((performance.now() - fpsT) / 1000)).toFixed(0) + " Hz";
+      frames = 0; fpsT = performance.now();
+    }
+
+    /* ---- rendu ---- */
+    const [r, g2, bl] = accent();
+    // voile plus léger en warp : les traînées persistent et étirent l'hyperespace
+    ctx.fillStyle = alerte === "arc" ? "rgba(4,5,10,.17)"
+                  : enPause ? "rgba(10,4,2,.30)" : "rgba(4,5,10,.34)";
+    ctx.fillRect(0, 0, W, Hh);
+
+    if (enPause){
+      // la faim monte : tout tombe plus vite à l'approche de la reprise
+      const faim = 1 + (1 - Math.min(1, secLeft / (pause / 1000))) * 2.6;
+      ctx.fillStyle = "#FFFFFF";   // sinon les emoji héritent du voile de fond
+      ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      for (const f of food){
+        f.y += f.vy * (reduce ? .3 : 1) * faim;
+        f.rot += f.vr * faim;
+        if (f.y > Hh + 80 * dpr) Object.assign(f, seedFood(true));
+        ctx.save();
+        ctx.translate(f.x, f.y); ctx.rotate(f.rot);
+        ctx.font = f.size + 'px "Segoe UI Emoji","Apple Color Emoji",sans-serif';
+        ctx.fillText(f.ch, 0, 0);
+        ctx.restore();
+      }
+    } else {
+      const warp = alerte === "arc";                 // hyperespace RGB sur les 10 dernières secondes
+      const urgence = over ? 5 : Math.max(.35, Math.min(4.5, 90 / Math.max(secLeft, 3)));
+      const speed = warp ? (reduce ? .02 : .075) : (reduce ? .12 : .5) * urgence * .004;
+      const cx = W / 2, cy = Hh / 2, fl = Math.min(W, Hh) * .9;
+      for (const st of stars){
+        st.z -= speed;
+        if (st.z <= .02){ Object.assign(st, seedStar(1)); continue; }
+        const x = cx + (st.x / st.z) * fl, y = cy + (st.y / st.z) * fl;
+        if (x < -60 || x > W + 60 || y < -60 || y > Hh + 60){ Object.assign(st, seedStar(1)); continue; }
+        const pz = Math.min(st.z + speed * (warp ? 3 : 9), 1);
+        const a = Math.min(1, (1 - st.z) * 1.1);
+        if (warp){
+          const [hr, hg, hb] = hsl((st.h + teinteArc() * 4) % 360, .62);
+          ctx.strokeStyle = `rgba(${hr},${hg},${hb},${a})`;
+          ctx.lineWidth = Math.max(1.5, (1 - st.z) * 3.6) * dpr;
+        } else {
+        ctx.strokeStyle = `rgba(${r},${g2},${bl},${a * .85})`;
+        ctx.lineWidth = Math.max(1, (1 - st.z) * 2.4) * dpr;
+        }
+        ctx.beginPath();
+        ctx.moveTo(cx + (st.x / pz) * fl, cy + (st.y / pz) * fl);
+        ctx.lineTo(x, y); ctx.stroke();
+      }
+    }
+
+    // le feu lèche le bas de l'écran : braises à 5 min, enfer à 1 min (l'arc-en-ciel, lui, part en warp)
+    const BRASIER = {
+      //        débit  teinte  étalement  vitesse  usure  taille  halo
+      rouge:  { n: 6,  h: 4,   d: 32,     f: 1,    dv: 1,   t: 18, halo: .20, wash: "255,60,20" },
+      violet: { n: 34, h: 262, d: 46,     f: 5.2,  dv: 2.3, t: 26, halo: .50, wash: "150,50,255" }
+    }[alerte];
+    if (BRASIER){
+      const haut = Hh * BRASIER.halo;
+      const g = ctx.createLinearGradient(0, Hh, 0, Hh - haut);
+      g.addColorStop(0, `rgba(${BRASIER.wash},.3)`);
+      g.addColorStop(1, "rgba(0,0,0,0)");
+      ctx.globalCompositeOperation = "lighter";
+      ctx.fillStyle = g; ctx.fillRect(0, Hh - haut, W, haut);
+      ctx.globalCompositeOperation = "source-over";
+      attise(reduce ? Math.ceil(BRASIER.n / 3) : BRASIER.n,
+             BRASIER.h, BRASIER.d, BRASIER.f, BRASIER.t, BRASIER.dv);
+    }
+    brule();
+
+    for (let i = bursts.length - 1; i >= 0; i--){
+      const p = bursts[i];
+      p.x += p.vx; p.y += p.vy; p.vy += .18 * dpr; p.life -= .012;
+      if (p.life <= 0){ bursts.splice(i, 1); continue; }
+      ctx.fillStyle = `hsla(${p.hue},100%,65%,${p.life})`;
+      ctx.fillRect(p.x, p.y, 3 * dpr, 3 * dpr);
+    }
+  }
+
+  /* --- commandes --- */
+  function fromInput(){
+    const v = $("when").value;
+    if (!v) return;
+    const [h, m] = v.split(":").map(Number);
+    depart = [h, m]; recale();
+  }
+  $("arm").addEventListener("click", fromInput);
+  $("when").addEventListener("change", fromInput);
+  document.querySelectorAll("[data-add]").forEach(btn =>
+    btn.addEventListener("click", () => {
+      const d = new Date(A.dep + Number(btn.dataset.add) * 60000);
+      depart = [d.getHours(), d.getMinutes()]; recale();
+    }));
+  $("sound").addEventListener("click", e => {
+    soundOn = !soundOn;
+    e.currentTarget.setAttribute("aria-pressed", String(soundOn));
+    if (soundOn) chirp(880, .08);
+  });
+  $("full").addEventListener("click", () => {
+    if (document.fullscreenElement) document.exitFullscreen();
+    else document.documentElement.requestFullscreen?.();
+  });
+  addEventListener("keydown", e => {
+    if (e.key.toLowerCase() === "f") $("full").click();
+    if (e.key.toLowerCase() === "r") recale();
+  });
+
+  /* --- téléphone : garder l'écran allumé, un compte à rebours qu'on regarde --- */
+  let veille = null;
+  async function garderAllume(){
+    try {
+      if ("wakeLock" in navigator && !veille){
+        veille = await navigator.wakeLock.request("screen");
+        veille.addEventListener("release", () => { veille = null; });
+      }
+    } catch { /* refusé ou non supporté : sans conséquence */ }
+  }
+  addEventListener("pointerdown", garderAllume);          // certains navigateurs exigent un geste
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") garderAllume();
+  });
+  garderAllume();
+
+  recale();
+  requestAnimationFrame(loop);
+})();
+</script>
+
+</body>
+</html>

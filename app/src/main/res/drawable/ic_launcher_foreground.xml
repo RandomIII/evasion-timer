@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Cadran cyan, dans la zone sûre centrale de l'icône adaptative -->
+    <path
+        android:strokeColor="#00E5FF"
+        android:strokeWidth="6"
+        android:fillColor="#00000000"
+        android:pathData="M30,54 a24,24 0 1,0 48,0 a24,24 0 1,0 -48,0" />
+    <!-- Aiguilles -->
+    <path
+        android:strokeColor="#E6ECF7"
+        android:strokeWidth="5"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M54,54 L54,38 M54,54 L65,60" />
+</vector>

@@ -1,0 +1,28 @@
+plugins {
+    id "com.android.application"
+}
+
+android {
+    namespace "com.evasion.timer"
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "com.evasion.timer"
+        minSdk 26          // Android 8.0 : icônes adaptatives natives, aucune image bitmap à fournir
+        targetSdk 34
+        versionCode 1
+        versionName "1.0"
+    }
+
+    buildTypes {
+        debug {
+            // APK de debug : signé automatiquement par la clé de debug, installable directement
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+// Aucune dépendance : l'app tient dans une Activity + WebView du framework Android.

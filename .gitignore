@@ -1,0 +1,16 @@
+# Sorties de build et caches — reconstruits par la CI, jamais versionnés
+.gradle/
+build/
+app/build/
+local.properties
+*.apk
+
+# Wrapper Gradle : régénéré par la CI (gradle wrapper), pas besoin de le committer
+gradle/
+gradlew
+gradlew.bat
+
+# IDE
+.idea/
+*.iml
+.DS_Store
