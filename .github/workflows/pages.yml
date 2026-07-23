@@ -1,0 +1,48 @@
+name: Deploy web
+
+# Publie la page sur GitHub Pages à chaque push, et manuellement (bouton Run workflow).
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Droits requis pour déployer sur Pages
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Un seul déploiement à la fois
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploiement.outputs.page_url }}
+    steps:
+      - name: Récupérer le code
+        uses: actions/checkout@v4
+
+      - name: Préparer le site
+        # Une seule source : le même index.html que l'APK embarque.
+        run: |
+          mkdir -p _site
+          cp app/src/main/assets/index.html _site/index.html
+
+      - name: Configurer Pages
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true      # active Pages automatiquement au premier passage
+
+      - name: Empaqueter le site
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - name: Déployer
+        id: deploiement
+        uses: actions/deploy-pages@v4
