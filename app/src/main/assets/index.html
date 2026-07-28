@@ -618,7 +618,12 @@
   const tauxToken = () => BASE_RATE * (1 + jeu.unlocked.filter(id => id.startsWith("rate")).length);
   /* ============================================================== */
 
-  const $ = id => document.getElementById(id);
+  // Épinglage : l'appli peut être déplacée dans une fenêtre Picture-in-Picture (toujours
+  // au premier plan). $ et le canvas doivent alors viser le document/fenêtre qui l'héberge.
+  let pipWin = null;
+  const hostDoc = () => pipWin ? pipWin.document : document;
+  const hostWin = () => pipWin || window;
+  const $ = id => hostDoc().getElementById(id);
   const pad = (n, w) => String(n).padStart(w, "0");
   const SEGMAP = {
     0:"abcdef", 1:"bc", 2:"abged", 3:"abgcd", 4:"fgbc",
@@ -708,7 +713,7 @@
   };
 
   let freed = false, lastSecond = -1, phase = "", lastPhase = "", lastAlerte = "", jourAffiche = -1;
-  let pipEl = null, lastTok = 0, tokSaveT = 0;   // épinglage PiP + comptage des tokens
+  let lastTok = 0, tokSaveT = 0;                 // comptage des tokens
 
   /* --- son --- */
   let ac = null, soundOn = false;
@@ -731,9 +736,10 @@
   let W = 0, Hh = 0, dpr = 1, stars = [], food = [], bursts = [];
 
   function resize(){
-    dpr = Math.min(devicePixelRatio || 1, 2);
-    W = cv.width = innerWidth * dpr; Hh = cv.height = innerHeight * dpr;
-    cv.style.width = innerWidth + "px"; cv.style.height = innerHeight + "px";
+    const win = hostWin();                          // suit l'appli si elle est épinglée en PiP
+    dpr = Math.min(win.devicePixelRatio || 1, 2);
+    W = cv.width = win.innerWidth * dpr; Hh = cv.height = win.innerHeight * dpr;
+    cv.style.width = win.innerWidth + "px"; cv.style.height = win.innerHeight + "px";
   }
   const seedStar = z => ({ x:(Math.random()-.5)*2, y:(Math.random()-.5)*2,
                            z: z ?? Math.random(), h: Math.random() * 360 });
@@ -853,9 +859,11 @@
   /* --- boucle --- */
   let frames = 0, fpsT = performance.now();
   function loop(){
-    requestAnimationFrame(loop);
+    hostWin().requestAnimationFrame(loop);
     const t = nowUs(), now = t / 1000;
     const b = document.body;
+    // si l'appli est épinglée en PiP, son body reçoit les mêmes classes d'état
+    if (pipWin) pipWin.document.body.className = b.className;
     if (new Date(now).getDate() !== jourAffiche) recale();   // minuit : on repart sur la journée suivante
 
     // tokens : le rAF ne tourne que fenêtre visible → on crédite le temps réellement passé
@@ -893,17 +901,6 @@
     setDigits(S, Math.floor(absR / 1e6) % 60);
     $("ms").textContent = pad(Math.floor(absR / 1e3) % 1000, 3);
     $("us").textContent = pad(absR % 1000, 3);
-
-    // fenêtre épinglée : miroir minimal, à la précision débloquée
-    if (pipEl){
-      if (phase === "libre") pipEl.textContent = "LIBRE";
-      else {
-        let s2 = pad(Math.min(Math.floor(absR / 3.6e9), 99), 2) + (aDebloque("min") ? "" : " h");
-        if (aDebloque("min")) s2 += ":" + pad(Math.floor(absR / 6e7) % 60, 2);
-        if (aDebloque("sec")) s2 += ":" + pad(Math.floor(absR / 1e6) % 60, 2);
-        pipEl.textContent = s2;
-      }
-    }
 
     // habillage selon la phase
     const secLeft = rem / 1e6;
@@ -1235,26 +1232,45 @@
   $("treeClose").addEventListener("click", () => ouvreArbre(false));
   addEventListener("keydown", e => { if (e.key === "Escape") ouvreArbre(false); });
 
-  /* --- épinglage : fenêtre Picture-in-Picture, toujours au premier plan (Chrome/Edge) --- */
+  /* --- épinglage : on déplace L'APPLI ELLE-MÊME dans une fenêtre PiP (toujours au 1er plan),
+     pas un mini-timer à part. À la fermeture, tout revient dans l'onglet. --- */
   async function epingler(){
-    if (pipEl){ pipEl.ownerDocument.defaultView.close(); pipEl = null; return; }
+    if (pipWin){ pipWin.close(); return; }              // déjà épinglé → on ferme (toggle)
     if (!("documentPictureInPicture" in window)){
-      alert("L'épinglage au premier plan nécessite Chrome ou Edge sur ordinateur.");
+      alert("L'épinglage au premier plan nécessite Chrome ou Edge sur ordinateur "
+          + "(pas disponible sur ce navigateur).");
       return;
     }
     try {
-      const w = await documentPictureInPicture.requestWindow({ width: 340, height: 190 });
-      const d = w.document;
-      d.body.style.cssText = "margin:0;height:100vh;display:flex;align-items:center;"
-        + "justify-content:center;background:#04050A;";
-      const el = d.createElement("div");
-      el.style.cssText = "font-family:Consolas,'SF Mono',monospace;font-variant-numeric:tabular-nums;"
-        + "font-size:54px;letter-spacing:2px;color:#00E5FF;text-shadow:0 0 22px #00E5FF;";
-      el.textContent = "…";
-      d.body.appendChild(el);
-      pipEl = el;
-      w.addEventListener("pagehide", () => { pipEl = null; });
-    } catch { /* refusé par l'utilisateur */ }
+      const w = await documentPictureInPicture.requestWindow({ width: 460, height: 300 });
+      // recopier nos styles (feuilles inline, même origine)
+      for (const ss of document.styleSheets){
+        try {
+          const st = w.document.createElement("style");
+          st.textContent = [...ss.cssRules].map(r => r.cssText).join("");
+          w.document.head.appendChild(st);
+        } catch { /* feuille inaccessible : ignorée */ }
+      }
+      w.document.documentElement.style.cssText = "margin:0;height:100%";
+      w.document.body.style.margin = "0";
+      w.document.body.className = document.body.className;
+      // déplacer tout le contenu visuel dans la fenêtre épinglée
+      pipWin = w;
+      while (document.body.firstChild) w.document.body.appendChild(document.body.firstChild);
+      document.body.innerHTML = '<div style="position:fixed;inset:0;display:flex;'
+        + 'align-items:center;justify-content:center;text-align:center;background:#04050A;'
+        + 'color:#5C6784;font-family:system-ui,sans-serif;font-size:14px;line-height:1.6">'
+        + 'Épinglé au premier plan&nbsp;↗<br>Ferme la petite fenêtre pour revenir ici.</div>';
+      resize();                                          // canvas recalé sur la fenêtre PiP
+      w.addEventListener("resize", resize);
+      w.addEventListener("pagehide", () => {             // fermeture : on rapatrie tout dans l'onglet
+        document.body.innerHTML = "";
+        while (w.document.body.firstChild) document.body.appendChild(w.document.body.firstChild);
+        pipWin = null;
+        resize();
+        window.requestAnimationFrame(loop);              // la boucle tournait sur la fenêtre PiP → relance
+      });
+    } catch { /* refusé ou interrompu */ }
   }
   $("pin").addEventListener("click", epingler);
 
@@ -1263,7 +1279,7 @@
   majArbre();
 
   recale();
-  requestAnimationFrame(loop);
+  hostWin().requestAnimationFrame(loop);
 })();
 </script>
 
