@@ -864,19 +864,28 @@
     const cibleUs = (enPause ? A.rep : A.dep) * 1000;
     const rem = cibleUs - t, over = rem < 0, abs = Math.abs(rem);
 
-    setDigits(H, Math.min(Math.floor(abs / 3.6e9), 99));
-    setDigits(M, Math.floor(abs / 6e7) % 60);
-    setDigits(S, Math.floor(abs / 1e6) % 60);
-    $("ms").textContent = pad(Math.floor(abs / 1e3) % 1000, 3);
-    $("us").textContent = pad(abs % 1000, 3);
+    // Affichage arrondi AU-DESSUS jusqu'à la plus petite unité débloquée : sinon, avec
+    // seulement les heures, 30 min restantes montreraient « 0 h » sans être LIBRE.
+    // (abs reste la vraie valeur : seuils, bips et logique ne doivent pas être arrondis.)
+    const unite = aDebloque("us")  ? 1
+                : aDebloque("ms")  ? 1e3
+                : aDebloque("sec") ? 1e6
+                : aDebloque("min") ? 6e7
+                :                    3.6e9;
+    const absR = over ? abs : Math.ceil(abs / unite) * unite;
+    setDigits(H, Math.min(Math.floor(absR / 3.6e9), 99));
+    setDigits(M, Math.floor(absR / 6e7) % 60);
+    setDigits(S, Math.floor(absR / 1e6) % 60);
+    $("ms").textContent = pad(Math.floor(absR / 1e3) % 1000, 3);
+    $("us").textContent = pad(absR % 1000, 3);
 
     // fenêtre épinglée : miroir minimal, à la précision débloquée
     if (pipEl){
       if (phase === "libre") pipEl.textContent = "LIBRE";
       else {
-        let s2 = pad(Math.min(Math.floor(abs / 3.6e9), 99), 2) + (aDebloque("min") ? "" : " h");
-        if (aDebloque("min")) s2 += ":" + pad(Math.floor(abs / 6e7) % 60, 2);
-        if (aDebloque("sec")) s2 += ":" + pad(Math.floor(abs / 1e6) % 60, 2);
+        let s2 = pad(Math.min(Math.floor(absR / 3.6e9), 99), 2) + (aDebloque("min") ? "" : " h");
+        if (aDebloque("min")) s2 += ":" + pad(Math.floor(absR / 6e7) % 60, 2);
+        if (aDebloque("sec")) s2 += ":" + pad(Math.floor(absR / 1e6) % 60, 2);
         pipEl.textContent = s2;
       }
     }
