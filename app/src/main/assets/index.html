@@ -1223,8 +1223,15 @@
     document.body.classList.toggle("tree-open", o);
     if (o) requestAnimationFrame(majArbre);      // laisse la grille se poser avant de tracer les liens
   }
-  $("tokBtn").addEventListener("click", () =>
-    ouvreArbre(!document.body.classList.contains("tree-open")));
+  $("tokBtn").addEventListener("click", e => {
+    if (e.shiftKey){                       // triche de test : Shift+clic = +5000 ✦ (modifie la save en mémoire)
+      jeu.earned += 5000; sauveJeu();
+      $("tokVal").textContent = $("treeVal").textContent = solde();
+      majArbre(); chirp(1046, .08);
+      return;
+    }
+    ouvreArbre(!document.body.classList.contains("tree-open"));
+  });
   $("treeClose").addEventListener("click", () => ouvreArbre(false));
   addEventListener("keydown", e => { if (e.key === "Escape") ouvreArbre(false); });
 
