@@ -70,6 +70,7 @@
     font-family:var(--cond);text-transform:uppercase;letter-spacing:.4em;
     font-size:clamp(11px,1.5vw,15px);color:var(--dim);
     display:flex;align-items:center;gap:.9em;text-align:center;
+    margin-bottom:clamp(12px,3vh,40px);        /* respirer entre le texte et l'heure */
   }
   .eyebrow b{color:var(--glow);font-weight:400;text-shadow:0 0 14px var(--glow);}
   .dot{
@@ -366,7 +367,7 @@
 
   /* ---------- arbre de compétences ---------- */
   .tree{
-    position:fixed;z-index:41;inset:0;overflow-y:auto;
+    position:fixed;z-index:41;inset:0;overflow:auto;
     background:linear-gradient(160deg,#080C16,#04050A);
     padding:calc(72px + env(safe-area-inset-top)) 20px calc(30px + env(safe-area-inset-bottom));
     transform:translateY(-100%);transition:transform .3s cubic-bezier(.4,0,.2,1);
@@ -378,29 +379,32 @@
                font-size:20px;color:var(--glow);margin:0 0 8px;text-shadow:0 0 24px var(--glow);}
   .treeSolde{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:22px;color:var(--ink);}
   .treeHint{color:var(--dim);font-size:12px;margin:6px 0 0;}
-  #treeBody{max-width:820px;margin:0 auto;display:grid;grid-template-columns:repeat(3,1fr);gap:18px;align-items:start;}
-  .branche h3{font-family:var(--cond);text-transform:uppercase;letter-spacing:.24em;
-              font-size:12px;color:var(--dim);margin:0 0 10px;text-align:center;}
-  .noeuds{display:flex;flex-direction:column;gap:10px;}
-  .noeud{display:flex;flex-direction:column;gap:3px;align-items:flex-start;text-align:left;
-         padding:11px 13px;border:1px solid #222C4A;background:#070A13;cursor:pointer;
+  /* l'arbre : grille positionnée (5 colonnes, nœuds en 1/3/5), connecteurs SVG dessous */
+  #treeBody{position:relative;max-width:720px;min-width:560px;margin:0 auto;padding:0;
+            display:grid;grid-template-columns:repeat(5,1fr);
+            column-gap:8px;row-gap:48px;justify-items:center;align-items:stretch;}
+  .treeLines{position:absolute;inset:0;width:100%;height:100%;z-index:1;pointer-events:none;overflow:visible;}
+  .noeud{position:relative;z-index:2;width:100%;
+         display:flex;flex-direction:column;gap:3px;align-items:flex-start;text-align:left;
+         padding:10px 12px;border:1px solid #222C4A;background:#070A13;cursor:pointer;
          transition:border-color .15s,background .15s,opacity .15s;}
-  .noeud .n-nom{font-family:var(--cond);text-transform:uppercase;letter-spacing:.1em;font-size:13px;color:var(--ink);}
-  .noeud .n-cout{font-family:var(--mono);font-size:12px;color:var(--dim);}
+  .noeud .n-nom{font-family:var(--cond);text-transform:uppercase;letter-spacing:.08em;
+                font-size:12px;line-height:1.15;color:var(--ink);}
+  .noeud .n-cout{font-family:var(--mono);font-size:11px;color:var(--dim);}
   .noeud:focus-visible{outline:2px solid var(--glow);outline-offset:2px;}
-  .noeud.buyable{border-color:var(--glow);}
+  .noeud.buyable{border-color:var(--glow);box-shadow:0 0 14px rgba(0,229,255,.25);}
   .noeud.buyable .n-cout{color:var(--glow);}
   .noeud.buyable:hover{background:#0F1626;}
   .noeud.pending{opacity:.85;}
   .noeud.pending .n-cout{color:var(--amber);}
-  .noeud.locked{opacity:.38;cursor:not-allowed;}
+  .noeud.locked{opacity:.34;cursor:not-allowed;}
   .noeud.owned{border-color:#2C7A52;background:#0A1A12;cursor:default;}
   .noeud.owned .n-cout{color:#3BF07A;}
   .noeud.owned .n-cout::before{content:"✓ ";}
+  .treeClose{display:block;margin:26px auto 0;}
 
   /* ---------- téléphone en portrait ---------- */
   @media (max-width:720px){
-    #treeBody{grid-template-columns:1fr;gap:22px;}
     .tokBtn{font-size:13px;padding:8px 11px;}
     :root{--u:clamp(30px,10.5vw,58px);}
     .stage{
@@ -500,9 +504,10 @@
   <div class="treeHead">
     <h2>Compétences</h2>
     <div class="treeSolde"><span id="treeVal">0</span> <span class="tokStar">✦</span> disponibles</div>
-    <p class="treeHint">Tu gagnes 1 ✦ par minute passée devant l'appli. Dépense-les pour débloquer — ça se joue sur plusieurs jours.</p>
+    <p class="treeHint">Tu gagnes des ✦ en attendant devant l'appli (1/min au départ, +1/min par upgrade d'économie). L'arbre descend : chaque nœud demande le précédent.</p>
   </div>
   <div id="treeBody"></div>
+  <button class="treeClose" id="treeClose">Fermer</button>
 </aside>
 <div class="backdrop" id="backdrop"></div>
 <aside class="panel" id="panel" aria-label="Réglages des horaires">
@@ -559,48 +564,58 @@
   ];
 
   /* ============ progression : tokens & arbre de compétences ============ */
-  // 1 ✦ par minute passée devant l'appli : la partie se joue sur plusieurs jours.
-  const TOKEN_RATE = 1 / 60;     // ✦ gagnés par seconde
-  const BRANCHES = [
-    { cle: "chiffres", nom: "Précision" },
-    { cle: "couleurs", nom: "Alertes" },
-    { cle: "confort",  nom: "Confort" }
-  ];
-  // id, libellé, coût (en ✦), prérequis (chaîne = arbre), branche.
-  // Chaque couleur est un package : couleur + secousses + flammes/hyperespace à SON palier,
-  // aux mêmes temps qu'avant (1 h / 15 min / 5 min / 1 min / 10 s).
+  // Vrai arbre qui descend : chaque nœud a un parent unique (pre) et une position
+  // (row = profondeur, col = colonne 1..5). Acheter une porte d'économie « +1 ✦/min »
+  // ouvre la branche des alertes, puis le Rainbow.
+  const BASE_RATE = 1 / 60;      // ✦ par seconde au départ (= 1/min), +1/min par upgrade d'éco
+  // id, libellé, coût (✦), prérequis, ligne, colonne
   const COMPETENCES = [
-    { id:"min",     nom:"Minutes",              cout:3,   pre:null,     br:"chiffres" },
-    { id:"sec",     nom:"Secondes",             cout:12,  pre:"min",    br:"chiffres" },
-    { id:"ms",      nom:"Millisecondes",        cout:120, pre:"sec",    br:"chiffres" },
-    { id:"us",      nom:"Microsecondes",        cout:300, pre:"ms",     br:"chiffres" },
-    { id:"jaune",   nom:"Jaune · 1 h",          cout:40,  pre:null,     br:"couleurs" },
-    { id:"orange",  nom:"Orange · 15 min",      cout:90,  pre:"jaune",  br:"couleurs" },
-    { id:"rouge",   nom:"Rouge + feu · 5 min",  cout:180, pre:"orange", br:"couleurs" },
-    { id:"violet",  nom:"Violet + brasier · 1 min", cout:360, pre:"rouge", br:"couleurs" },
-    { id:"arc",     nom:"RAINBOW ultime · 10 s",cout:750, pre:"violet", br:"couleurs" },
-    { id:"stats",   nom:"Statistiques",         cout:15,  pre:null,     br:"confort" },
-    { id:"bg",      nom:"Décor spatial",        cout:25,  pre:null,     br:"confort" },
-    { id:"son",     nom:"Alertes sonores",      cout:20,  pre:null,     br:"confort" },
-    { id:"full",    nom:"Plein écran",          cout:18,  pre:null,     br:"confort" },
-    { id:"wake",    nom:"Garder l'écran allumé",cout:30,  pre:null,     br:"confort" },
-    { id:"lunch",   nom:"Pause déjeuner",       cout:55,  pre:null,     br:"confort" },
-    { id:"pin",     nom:"Épingler au 1er plan", cout:450, pre:"stats",  br:"confort" }
+    { id:"start",  nom:"Compte à rebours",     cout:0,   pre:null,     row:1, col:3 },
+
+    { id:"stats",  nom:"Statistiques",         cout:15,  pre:"start",  row:2, col:3 },
+
+    { id:"min",    nom:"Minutes",              cout:20,  pre:"stats",  row:3, col:1 },
+    { id:"rate1",  nom:"+1 ✦ / min",           cout:40,  pre:"stats",  row:3, col:3 },
+    { id:"bg",     nom:"Décor spatial",        cout:25,  pre:"stats",  row:3, col:5 },
+
+    { id:"sec",    nom:"Secondes",             cout:55,  pre:"min",    row:4, col:1 },
+    { id:"jaune",  nom:"Jaune · 1 h",          cout:60,  pre:"rate1",  row:4, col:3 },
+    { id:"wake",   nom:"Écran allumé",         cout:30,  pre:"bg",     row:4, col:5 },
+
+    { id:"ms",     nom:"Millisecondes",        cout:140, pre:"sec",    row:5, col:1 },
+    { id:"orange", nom:"Orange · 15 min",      cout:120, pre:"jaune",  row:5, col:3 },
+    { id:"full",   nom:"Plein écran",          cout:20,  pre:"wake",   row:5, col:5 },
+
+    { id:"us",     nom:"Microsecondes",        cout:340, pre:"ms",     row:6, col:1 },
+    { id:"rouge",  nom:"Rouge + feu · 5 min",  cout:220, pre:"orange", row:6, col:3 },
+    { id:"son",    nom:"Alertes sonores",      cout:25,  pre:"full",   row:6, col:5 },
+
+    { id:"violet", nom:"Violet + brasier · 1 min", cout:400, pre:"rouge", row:7, col:3 },
+    { id:"lunch",  nom:"Pause déjeuner",       cout:55,  pre:"son",    row:7, col:5 },
+
+    { id:"rate2",  nom:"+1 ✦ / min",           cout:300, pre:"violet", row:8, col:3 },
+    { id:"pin",    nom:"Épingler au 1er plan", cout:450, pre:"lunch",  row:8, col:5 },
+
+    { id:"arc",    nom:"RAINBOW ultime · 10 s",cout:800, pre:"rate2",  row:9, col:3 }
   ];
   const COUT = Object.fromEntries(COMPETENCES.map(c => [c.id, c.cout]));
   const CLE_JEU = "evasion.jeu";
   function chargeJeu(){
+    let o = { earned: 0, unlocked: [] };
     try {
-      const o = JSON.parse(localStorage.getItem(CLE_JEU));
-      if (o && typeof o.earned === "number" && Array.isArray(o.unlocked)) return o;
+      const p = JSON.parse(localStorage.getItem(CLE_JEU));
+      if (p && typeof p.earned === "number" && Array.isArray(p.unlocked)) o = p;
     } catch {}
-    return { earned: 0, unlocked: [] };
+    if (!o.unlocked.includes("start")) o.unlocked.push("start");   // racine toujours acquise
+    return o;
   }
   let jeu = chargeJeu();
   function sauveJeu(){ try { localStorage.setItem(CLE_JEU, JSON.stringify(jeu)); } catch {} }
   const aDebloque = id => jeu.unlocked.includes(id);
   const depense = () => jeu.unlocked.reduce((s, id) => s + (COUT[id] || 0), 0);
   const solde = () => Math.max(0, Math.floor(jeu.earned) - depense());
+  // chaque porte d'économie ajoute 1 ✦/min au revenu de base
+  const tauxToken = () => BASE_RATE * (1 + jeu.unlocked.filter(id => id.startsWith("rate")).length);
   /* ============================================================== */
 
   const $ = id => document.getElementById(id);
@@ -845,7 +860,7 @@
 
     // tokens : le rAF ne tourne que fenêtre visible → on crédite le temps réellement passé
     const pn = performance.now();
-    if (lastTok) jeu.earned += Math.min(1, (pn - lastTok) / 1000) * TOKEN_RATE;
+    if (lastTok) jeu.earned += Math.min(1, (pn - lastTok) / 1000) * tauxToken();
     lastTok = pn;
     const s = solde();
     $("tokVal").textContent = s; $("treeVal").textContent = s;
@@ -1138,28 +1153,44 @@
     for (const c of COMPETENCES) b.classList.toggle("lock-" + c.id, !aDebloque(c.id));
   }
   const noeudEls = {};
+  const SVGNS = "http://www.w3.org/2000/svg";
   function construitArbre(){
     const body = $("treeBody"); body.innerHTML = "";
-    for (const br of BRANCHES){
-      const col = document.createElement("div"); col.className = "branche";
-      const h = document.createElement("h3"); h.textContent = br.nom; col.appendChild(h);
-      const wrap = document.createElement("div"); wrap.className = "noeuds";
-      for (const c of COMPETENCES.filter(x => x.br === br.cle)){
-        const n = document.createElement("button");
-        n.type = "button"; n.className = "noeud"; n.dataset.id = c.id;
-        n.innerHTML = '<span class="n-nom"></span><span class="n-cout"></span>';
-        n.querySelector(".n-nom").textContent = c.nom;
-        n.querySelector(".n-cout").textContent = c.cout + " ✦";
-        n.addEventListener("click", () => tenteAchat(c.id));
-        wrap.appendChild(n); noeudEls[c.id] = n;
-      }
-      col.appendChild(wrap); body.appendChild(col);
+    const svg = document.createElementNS(SVGNS, "svg");   // couche des connecteurs, sous les nœuds
+    svg.setAttribute("class", "treeLines"); svg.id = "treeLines";
+    body.appendChild(svg);
+    const rows = Math.max(...COMPETENCES.map(c => c.row));
+    body.style.gridTemplateRows = "repeat(" + rows + ", auto)";
+    for (const c of COMPETENCES){
+      const n = document.createElement("button");
+      n.type = "button"; n.className = "noeud"; n.dataset.id = c.id;
+      n.style.gridColumn = c.col; n.style.gridRow = c.row;
+      n.innerHTML = '<span class="n-nom"></span><span class="n-cout"></span>';
+      n.querySelector(".n-nom").textContent = c.nom;
+      n.querySelector(".n-cout").textContent = c.cout ? c.cout + " ✦" : "acquis";
+      if (c.id !== "start") n.addEventListener("click", () => tenteAchat(c.id));
+      body.appendChild(n); noeudEls[c.id] = n;
     }
-    const close = document.createElement("button");
-    close.className = "reset"; close.textContent = "Fermer";
-    close.style.cssText = "grid-column:1/-1;justify-self:center;margin-top:22px;";
-    close.addEventListener("click", () => ouvreArbre(false));
-    body.appendChild(close);
+    addEventListener("resize", () => {
+      if (document.body.classList.contains("tree-open")) traceLignes();
+    });
+  }
+  function traceLignes(){                       // relie chaque nœud à son parent (courbes de Bézier)
+    const svg = $("treeLines"), body = $("treeBody");
+    if (!svg) return;
+    const R = body.getBoundingClientRect();
+    let d = "";
+    for (const c of COMPETENCES){
+      const a = noeudEls[c.pre], b = noeudEls[c.id];
+      if (!a || !b) continue;
+      const ra = a.getBoundingClientRect(), rb = b.getBoundingClientRect();
+      const x1 = ra.left - R.left + ra.width / 2, y1 = ra.bottom - R.top;
+      const x2 = rb.left - R.left + rb.width / 2, y2 = rb.top - R.top;
+      const my = (y1 + y2) / 2;
+      const col = aDebloque(c.id) ? "#3BF07A" : aDebloque(c.pre) ? "#00E5FF" : "#26314A";
+      d += `<path d="M${x1} ${y1} C ${x1} ${my} ${x2} ${my} ${x2} ${y2}" fill="none" stroke="${col}" stroke-width="2"/>`;
+    }
+    svg.innerHTML = d;
   }
   function majArbre(){
     const bal = solde();
@@ -1167,14 +1198,15 @@
     for (const c of COMPETENCES){
       const el = noeudEls[c.id]; if (!el) continue;
       let st;
-      if (aDebloque(c.id))                     st = "owned";
-      else if (c.pre && !aDebloque(c.pre))     st = "locked";
+      if (aDebloque(c.id))          st = "owned";
+      else if (!aDebloque(c.pre))   st = "locked";     // parent pas encore acheté
       else if (bal >= c.cout){ st = "buyable"; dispo = true; }
-      else                                     st = "pending";
+      else                          st = "pending";
       el.className = "noeud " + st;
       el.disabled = (st === "owned" || st === "locked");
     }
     $("tokBtn").classList.toggle("ready", dispo);
+    traceLignes();
   }
   function tenteAchat(id){
     const c = COMPETENCES.find(x => x.id === id);
@@ -1189,10 +1221,11 @@
   }
   function ouvreArbre(o){
     document.body.classList.toggle("tree-open", o);
-    if (o) majArbre();
+    if (o) requestAnimationFrame(majArbre);      // laisse la grille se poser avant de tracer les liens
   }
   $("tokBtn").addEventListener("click", () =>
     ouvreArbre(!document.body.classList.contains("tree-open")));
+  $("treeClose").addEventListener("click", () => ouvreArbre(false));
   addEventListener("keydown", e => { if (e.key === "Escape") ouvreArbre(false); });
 
   /* --- épinglage : fenêtre Picture-in-Picture, toujours au premier plan (Chrome/Edge) --- */
