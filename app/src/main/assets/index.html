@@ -572,31 +572,32 @@
   const COMPETENCES = [
     { id:"start",  nom:"Compte à rebours",     cout:0,   pre:null,     row:1, col:3 },
 
-    { id:"stats",  nom:"Statistiques",         cout:15,  pre:"start",  row:2, col:3 },
+    // premier embranchement : lire l'heure (gauche) vs comprendre sa journée (droite)
+    { id:"min",    nom:"Minutes",              cout:20,  pre:"start",  row:2, col:2 },
+    { id:"stats",  nom:"Statistiques",         cout:15,  pre:"start",  row:2, col:4 },
 
-    { id:"min",    nom:"Minutes",              cout:20,  pre:"stats",  row:3, col:1 },
-    { id:"rate1",  nom:"+1 ✦ / min",           cout:40,  pre:"stats",  row:3, col:3 },
+    { id:"sec",    nom:"Secondes",             cout:55,  pre:"min",    row:3, col:1 },
+    { id:"rate1",  nom:"+1 ✦ / min",           cout:40,  pre:"min",    row:3, col:3 },  // porte d'éco
     { id:"bg",     nom:"Décor spatial",        cout:25,  pre:"stats",  row:3, col:5 },
 
-    { id:"sec",    nom:"Secondes",             cout:55,  pre:"min",    row:4, col:1 },
+    { id:"ms",     nom:"Millisecondes",        cout:140, pre:"sec",    row:4, col:1 },
     { id:"jaune",  nom:"Jaune · 1 h",          cout:60,  pre:"rate1",  row:4, col:3 },
+    { id:"lunch",  nom:"Pause déjeuner",       cout:55,  pre:"stats",  row:4, col:4 },
     { id:"wake",   nom:"Écran allumé",         cout:30,  pre:"bg",     row:4, col:5 },
 
-    { id:"ms",     nom:"Millisecondes",        cout:140, pre:"sec",    row:5, col:1 },
+    { id:"us",     nom:"Microsecondes",        cout:340, pre:"ms",     row:5, col:1 },
+    { id:"son",    nom:"Alertes sonores",      cout:25,  pre:"jaune",  row:5, col:2 },
     { id:"orange", nom:"Orange · 15 min",      cout:120, pre:"jaune",  row:5, col:3 },
     { id:"full",   nom:"Plein écran",          cout:20,  pre:"wake",   row:5, col:5 },
 
-    { id:"us",     nom:"Microsecondes",        cout:340, pre:"ms",     row:6, col:1 },
     { id:"rouge",  nom:"Rouge + feu · 5 min",  cout:220, pre:"orange", row:6, col:3 },
-    { id:"son",    nom:"Alertes sonores",      cout:25,  pre:"full",   row:6, col:5 },
+    { id:"pin",    nom:"Épingler au 1er plan", cout:450, pre:"full",   row:6, col:5 },
 
     { id:"violet", nom:"Violet + brasier · 1 min", cout:400, pre:"rouge", row:7, col:3 },
-    { id:"lunch",  nom:"Pause déjeuner",       cout:55,  pre:"son",    row:7, col:5 },
 
-    { id:"rate2",  nom:"+1 ✦ / min",           cout:300, pre:"violet", row:8, col:3 },
-    { id:"pin",    nom:"Épingler au 1er plan", cout:450, pre:"lunch",  row:8, col:5 },
-
-    { id:"arc",    nom:"RAINBOW ultime · 10 s",cout:800, pre:"rate2",  row:9, col:3 }
+    // dernière ligne droite : la porte d'éco 2 exige d'avoir poussé la précision
+    { id:"rate2",  nom:"+1 ✦ / min",           cout:300, pre:"us",     row:8, col:1 },
+    { id:"arc",    nom:"RAINBOW ultime · 10 s",cout:800, pre:"violet", row:8, col:3 }
   ];
   const COUT = Object.fromEntries(COMPETENCES.map(c => [c.id, c.cout]));
   const CLE_JEU = "evasion.jeu";

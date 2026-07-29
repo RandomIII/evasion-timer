@@ -9,11 +9,23 @@ l'ambiance de fond, et déclenche un **climax propre au thème** à la libérati
 ## Principe
 
 - Le monde actuel (néon / salle de contrôle arcade RGB) devient le **Monde 1**.
-- Le ✦ global sert à **débloquer/acheter un monde**.
-- Chaque monde a ensuite **sa propre monnaie locale** (gagnée quand ce monde est
-  actif) et **son propre arbre d'upgrades**.
+- Chaque monde a **sa propre monnaie locale** (gagnée quand ce monde est actif)
+  et **son propre arbre d'upgrades**.
 - Chaque monde définit : palette, rendu de fond (dessin canvas), style
   d'afficheur, animation de fin, monnaie, arbre d'upgrades.
+
+## Progression : rebirth / prestige (modèle retenu)
+
+- On débloque les mondes par **prestige**, pas par achat libre.
+- Quand **toutes les upgrades d'un monde sont achetées**, un bouton **PRESTIGE**
+  (en **violet**) apparaît. Tant qu'il n'est pas disponible, il est **invisible**.
+- Cliquer PRESTIGE donne accès au **monde suivant**.
+- **Bouton planète** : sous le bouton menu ☰, un bouton planète permet de
+  **changer de monde** (naviguer entre les mondes débloqués). Il n'apparaît
+  **qu'après le 1er prestige** (avant, il n'y a qu'un monde, donc inutile).
+- Une fois débloqués, on **switche librement** entre les mondes via la planète —
+  chacun garde sa progression. (Le prestige gate l'accès ; il ne force pas à
+  abandonner son monde préféré.)
 
 ## Mondes envisagés
 
@@ -65,8 +77,9 @@ il faudra **transformer un « monde » en module** exposant :
 - sa monnaie,
 - son arbre d'upgrades.
 
-Plus un **écran de sélection de mondes** et une **sauvegarde par monde**
-(localStorage segmenté).
+Plus un **écran de sélection de mondes** (bouton planète), une **sauvegarde par
+monde** (localStorage segmenté) et l'**état de prestige** (mondes débloqués,
+monde actif).
 
 Une fois cette ossature posée, ajouter un volcan ou des abysses = brancher un
 nouveau module.
