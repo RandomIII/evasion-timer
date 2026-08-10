@@ -348,8 +348,6 @@
   body.lock-pin .need-pin{display:none;}
   body.lock-son .need-son{display:none;}
   body.lock-full .need-full{display:none;}
-  body.lock-prof .cell-prof{display:none;}
-  body.lock-press .cell-press{display:none;}
   /* dans les abysses, profondeur et pression remplacent la cellule technique ;
      la frise est inutile puisque la descente elle-même montre l'avancement */
   body.monde-abysses .cell-fps,body.monde-abysses .day{display:none;}
@@ -369,6 +367,90 @@
   .tokBtn.ready{animation:tokReady 1.1s ease-in-out infinite;}   /* pulse : un achat est possible */
   @keyframes tokReady{0%,100%{box-shadow:0 0 0 rgba(0,229,255,0)}
                       50%{box-shadow:0 0 18px var(--glow);border-color:var(--glow)}}
+
+  /* ---------- instruments de plongée (RP : l'écran est le masque) ---------- */
+  .depthRule,.pressGauge,.visorCrack{display:none;}
+  body.monde-abysses:not(.lock-prof)  .depthRule{display:block;}
+  body.monde-abysses:not(.lock-press) .pressGauge{display:block;}
+
+  /* règle de profondeur, à droite */
+  .depthRule{
+    position:fixed;z-index:30;pointer-events:none;
+    right:calc(22px + env(safe-area-inset-right));top:16vh;height:68vh;width:96px;
+    font-family:var(--mono);font-variant-numeric:tabular-nums;
+  }
+  .dr-axis{position:absolute;right:14px;top:0;bottom:0;width:2px;
+           background:linear-gradient(rgba(190,240,255,.7),rgba(190,240,255,.15));}
+  .dr-ticks{position:absolute;inset:0;}
+  .dr-ticks i{position:absolute;right:14px;height:1px;background:rgba(190,240,255,.45);}
+  .dr-ticks i.maj{height:2px;background:rgba(210,248,255,.8);}
+  .dr-ticks b{position:absolute;right:26px;transform:translateY(-50%);
+              font-size:10px;font-weight:400;color:rgba(198,236,250,.75);
+              text-shadow:0 1px 6px rgba(0,18,30,.9);}
+  .dr-cursor{
+    position:absolute;right:6px;transform:translateY(-50%);
+    display:flex;align-items:baseline;gap:2px;padding:3px 7px;
+    background:rgba(2,20,32,.86);border:1px solid var(--glow);
+    box-shadow:0 0 14px color-mix(in srgb,var(--glow) 55%,transparent);
+    transition:top .25s linear;
+  }
+  .dr-cursor b{font-size:15px;color:var(--glow);font-weight:400;}
+  .dr-cursor i{font-size:9px;font-style:normal;color:rgba(190,230,245,.8);}
+  .dr-cursor::after{                              /* pointe vers l'axe */
+    content:"";position:absolute;right:-9px;top:50%;transform:translateY(-50%);
+    border:5px solid transparent;border-left-color:var(--glow);
+  }
+
+  /* manomètre, en bas à gauche */
+  .pressGauge{
+    position:fixed;z-index:30;pointer-events:none;
+    left:calc(20px + env(safe-area-inset-left));bottom:calc(20px + env(safe-area-inset-bottom));
+    width:126px;height:126px;
+  }
+  .pressGauge svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible;}
+  .pg-ring{fill:#0A1C28;stroke:#28596E;stroke-width:3;}
+  .pg-face{fill:radial-gradient(#08202E,#04121B);fill:#07202E;stroke:#123443;stroke-width:1;}
+  .pg-needle{stroke:#FF6B4A;stroke-width:3;stroke-linecap:round;
+             transform-origin:60px 60px;transition:transform .3s ease-out;}
+  .pg-hub{fill:#D8E8F0;}
+  #pgTicks line{stroke:rgba(190,228,244,.6);stroke-width:1.6;}
+  #pgTicks line.maj{stroke:rgba(226,244,255,.95);stroke-width:2.4;}
+  .pg-crack{opacity:0;transition:opacity .4s;}
+  .pg-crack path{fill:none;stroke:rgba(232,248,255,.85);stroke-width:1.4;stroke-linecap:round;}
+  body.pg-fissure .pg-crack{opacity:1;}
+  .pg-val{
+    position:absolute;left:50%;bottom:24px;transform:translateX(-50%);
+    font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:12px;
+    color:#CFEAF6;text-shadow:0 1px 6px rgba(0,18,30,.9);white-space:nowrap;
+  }
+  .pg-led{
+    position:absolute;left:50%;top:30px;transform:translateX(-50%);
+    width:11px;height:11px;border-radius:50%;
+    background:#2BE07A;box-shadow:0 0 12px #2BE07A;
+  }
+  body.led-jaune  .pg-led{background:#FFE04A;box-shadow:0 0 12px #FFE04A;}
+  body.led-orange .pg-led{background:#FF9A1F;box-shadow:0 0 14px #FF9A1F;animation:ledBlink 1s steps(2,end) infinite;}
+  body.led-rouge  .pg-led{background:#FF3B2F;box-shadow:0 0 16px #FF3B2F;animation:ledBlink .45s steps(2,end) infinite;}
+  body.led-noire  .pg-led{background:#1A1A1A;box-shadow:inset 0 0 6px #000;animation:none;}
+  @keyframes ledBlink{0%,49%{opacity:1}50%,100%{opacity:.12}}
+
+  /* la vitre du casque : dernière minute */
+  .visorCrack{
+    position:fixed;inset:0;z-index:31;pointer-events:none;
+    width:100%;height:100%;opacity:0;transition:opacity .5s;
+  }
+  .visorCrack path{
+    fill:none;stroke:rgba(226,246,255,.6);stroke-width:2;
+    filter:drop-shadow(0 0 3px rgba(160,220,255,.55));
+  }
+  body.monde-abysses.visor-casse .visorCrack{display:block;opacity:1;}
+
+  @media (max-width:720px){
+    .depthRule{height:56vh;top:20vh;width:76px;right:8px;}
+    .pressGauge{width:96px;height:96px;left:10px;bottom:10px;}
+    .pg-led{top:22px;width:9px;height:9px;}
+    .pg-val{bottom:18px;font-size:11px;}
+  }
 
   /* ---------- bouton monde (planète) : visible après le 1er prestige ---------- */
   .worldBtn{
@@ -533,12 +615,40 @@
     <div class="cell"><span class="k">reste à tirer</span><span class="v" id="tLeft">—</span></div>
     <div class="cell"><span class="k">journée</span><span class="v" id="tPct">—</span></div>
     <div class="cell"><span class="k" id="kExtra">prochaine pause</span><span class="v" id="tExtra">—</span></div>
-    <div class="cell cell-prof"><span class="k">profondeur</span><span class="v" id="tProf">—</span></div>
-    <div class="cell cell-press"><span class="k">pression</span><span class="v" id="tPress">—</span></div>
     <div class="cell cell-fps"><span class="k">rafraîchissement</span><span class="v" id="tFps">—</span></div>
   </div>
 
 </main>
+
+<!-- Instruments de plongée : règle de profondeur (droite) et manomètre (bas-gauche) -->
+<div class="depthRule" id="depthRule" aria-hidden="true">
+  <div class="dr-axis"></div>
+  <div class="dr-ticks" id="drTicks"></div>
+  <div class="dr-cursor" id="drCursor"><b id="drVal">0</b><i>m</i></div>
+</div>
+
+<div class="pressGauge" id="pressGauge" aria-hidden="true">
+  <svg viewBox="0 0 120 120">
+    <circle cx="60" cy="60" r="55" class="pg-ring"/>
+    <circle cx="60" cy="60" r="49" class="pg-face"/>
+    <g id="pgTicks"></g>
+    <line x1="60" y1="60" x2="60" y2="20" id="pgNeedle" class="pg-needle"/>
+    <circle cx="60" cy="60" r="4.5" class="pg-hub"/>
+  </svg>
+  <svg viewBox="0 0 120 120" class="pg-crack" id="pgCrack">
+    <path d="M78 38 L60 60 L46 94 M78 38 L52 32 L22 38 M78 38 L96 64 L106 92
+             M60 60 L40 56 M52 32 L58 14 M96 64 L112 56 M60 60 L66 90"/>
+  </svg>
+  <span class="pg-led" id="pgLed"></span>
+  <span class="pg-val" id="pgVal">1.0 bar</span>
+</div>
+
+<!-- vitre du casque qui se fissure dans la dernière minute -->
+<svg class="visorCrack" id="visorCrack" viewBox="0 0 1000 700" preserveAspectRatio="none" aria-hidden="true">
+  <path d="M742 128 L612 292 L516 512 L470 700 M742 128 L556 182 L300 198 L44 148
+           M742 128 L858 326 L968 512 M612 292 L430 330 L188 418 M858 326 L1000 296
+           M516 512 L636 648 M300 198 L286 52 M430 330 L392 470 M968 512 L1000 620"/>
+</svg>
 
 <!-- Compteur de tokens (haut-gauche) : ouvre l'arbre de compétences -->
 <button class="tokBtn" id="tokBtn" aria-label="Compétences">
@@ -1077,7 +1187,59 @@
     c.beginPath(); c.arc(L * .45, -L * .18, L * .11, 0, 6.283); c.fill();
   }
 
-  let profM = 0;                            // profondeur courante, lue par la télémétrie
+  /* ---- instruments : règle de profondeur + manomètre ----
+     RP : l'écran est le masque du plongeur. La vitre du manomètre puis celle du
+     casque se fissurent quand la pression devient critique. */
+  let rulePM = -1;                          // profondeur max déjà graduée
+  function construitRegle(PM){
+    if (rulePM === PM) return;
+    rulePM = PM;
+    const pas = PM <= 40 ? 5 : PM <= 250 ? 25 : PM <= 700 ? 100 : 200;
+    let h = "";
+    for (let m = 0; m <= PM; m += pas){
+      const y = (m / PM) * 100, maj = (m % (pas * 2) === 0);
+      h += '<i class="' + (maj ? "maj" : "") + '" style="top:' + y + '%;width:'
+         + (maj ? 14 : 8) + 'px"></i>';
+      if (maj) h += '<b style="top:' + y + '%">' + m + '</b>';
+    }
+    $("drTicks").innerHTML = h;
+    // graduations du cadran, une fois par échelle
+    const barMax = 1 + PM / 10;
+    let t = "";
+    for (let i = 0; i <= 8; i++){
+      const a = (-120 + i * 30) * Math.PI / 180, maj = i % 2 === 0;
+      const r1 = maj ? 36 : 40, r2 = 46;
+      t += '<line class="' + (maj ? "maj" : "") + '" x1="' + (60 + Math.sin(a) * r1).toFixed(1)
+         + '" y1="' + (60 - Math.cos(a) * r1).toFixed(1)
+         + '" x2="' + (60 + Math.sin(a) * r2).toFixed(1)
+         + '" y2="' + (60 - Math.cos(a) * r2).toFixed(1) + '"/>';
+    }
+    $("pgTicks").innerHTML = t;
+    $("pressGauge").dataset.max = barMax;
+  }
+  function majInstruments(secDep){
+    const PM = profMax();
+    construitRegle(PM);
+    // règle : le curseur descend avec nous
+    $("drCursor").style.top = Math.max(0, Math.min(100, profM / PM * 100)) + "%";
+    $("drVal").textContent = "−" + (profM < 100 ? profM.toFixed(1) : Math.round(profM));
+    // manomètre : 1 bar d'atmosphère + 1 bar par tranche de 10 m
+    const bar = 1 + profM / 10, barMax = Number($("pressGauge").dataset.max) || 1;
+    $("pgNeedle").style.transform =
+      "rotate(" + (-120 + Math.min(1, bar / barMax) * 240).toFixed(1) + "deg)";
+    $("pgVal").textContent = bar.toFixed(bar < 100 ? 1 : 0) + " bar";
+    // état de la LED. Une fois le départ passé, tout redevient calme :
+    // sinon les fissures resteraient à l'écran toute la soirée.
+    const b = document.body, avant = secDep > 0;
+    const etat = !avant ? "" : secDep <= 60 ? "noire" : secDep <= 300 ? "rouge"
+               : secDep <= 1200 ? "orange" : secDep <= 3600 ? "jaune" : "";
+    for (const e of ["jaune", "orange", "rouge", "noire"])
+      b.classList.toggle("led-" + e, etat === e);
+    b.classList.toggle("pg-fissure", avant && secDep <= 300);   // vitre du manomètre
+    b.classList.toggle("visor-casse", avant && secDep <= 60);   // vitre du casque
+  }
+
+  let profM = 0;                            // profondeur courante
   function dessineAbysses(prog, enPause, alerte, libre){
     initAbysses();
     const p = Math.max(0, Math.min(1, prog));
@@ -1459,11 +1621,7 @@
       $("tExtra").textContent = String(Math.max(0, Math.floor((A.dep - now) / 3e5)));
     }
 
-    if (save.actif === "abysses"){
-      // pression réelle : 1 bar d'atmosphère + 1 bar par tranche de 10 m d'eau
-      $("tProf").textContent  = "−" + profM.toFixed(profM < 100 ? 1 : 0) + " m";
-      $("tPress").textContent = (1 + profM / 10).toFixed(2) + " bar";
-    }
+    if (save.actif === "abysses") majInstruments(secDep);
 
     frames++;
     if (performance.now() - fpsT > 500){
