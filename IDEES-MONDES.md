@@ -40,13 +40,36 @@ l'ambiance de fond, et déclenche un **climax propre au thème** à la libérati
   de l'écran.
 - Monnaie locale : cendres / obsidienne.
 
-### 🌊 Abysses
+### 🌊 Abysses — **⭐ CHOISI COMME MONDE 2 (prochain à construire)**
 - Le timer devient l'**air restant** d'un plongeur qui **remonte** vers la
   surface au fil de la journée.
 - Climax : il **crève la surface** = LIBRE.
 - Upgrades : **+ de poissons**, bancs, méduses bioluminescentes, une baleine qui
   traverse l'écran.
 - Monnaie locale : bulles d'air.
+- Caméra verticale qui suit le plongeur (remontée = progression de la journée).
+- Palette d'alerte → **profondeur / lumière** : plus on remonte, plus l'eau
+  s'éclaircit (noir abyssal → bleu profond → turquoise → surface scintillante).
+- Pause midi : le plongeur fait un **palier de décompression**.
+
+### 🌱 L'Arbre — de la graine à l'espace
+- La **croissance verticale est la barre de progression** : la caméra suit la
+  cime, on monte avec l'arbre toute la journée.
+- Étapes : graine dans la terre (08:30) → germination → tige et feuilles →
+  le tronc dépasse les nuages → stratosphère, les étoiles apparaissent →
+  il perce l'atmosphère.
+- Climax : **IL FLEURIT** — explosion de fleurs, pétales en apesanteur.
+- Pause midi : la **pluie tombe**, l'arbre boit (équivalent du hamburger).
+- Palette d'alerte → **le ciel** : jaune = lumière dorée, orange = crépuscule,
+  rouge = dernières braises du couchant, violet = nuit stratosphérique,
+  RAINBOW = **aurore boréale**.
+- Monnaie locale : la **sève**.
+- Upgrades : racines visibles sous terre, feuillage plus dense, oiseaux qui
+  nichent, lucioles au crépuscule, fruits, satellites croisés en altitude,
+  vent dans les branches, floraison finale plus spectaculaire.
+- ⚠️ Chevauche un peu le monde Japon (pétales/floraison). À trancher : fusionner
+  (l'arbre final est un cerisier géant) ou différencier — l'Arbre = voyage
+  **vertical et cosmique**, le Japon = scène **horizontale et zen**.
 
 ### 🌸 Japon / cerisiers
 - Pétales qui tombent, ambiance zen.
@@ -84,7 +107,16 @@ monde actif).
 Une fois cette ossature posée, ajouter un volcan ou des abysses = brancher un
 nouveau module.
 
-## Ordre suggéré pour démarrer
+## Ordre de construction
 
-Commencer par un monde très visuel pour valider l'architecture :
-**Abysses** ou **Volcan** en premier.
+1. **🌊 Abysses** — choisi comme Monde 2, premier à construire. Sert aussi de
+   test pour l'architecture modulaire (caméra verticale, monnaie locale, arbre
+   propre, climax).
+2. Ensuite, au choix : 🌱 l'Arbre, 🌋 le Volcan, 🌸 le Japon, 🍂 les Saisons,
+   🏘️ le Village.
+
+## Questions encore ouvertes
+
+- Climax du monde **Saisons** (transition finale ? tempête de neige ?).
+- Monnaie du monde **Village** (ressources ? habitants ?).
+- Fusionner ou non **l'Arbre** et le **Japon** (chevauchement floraison).
