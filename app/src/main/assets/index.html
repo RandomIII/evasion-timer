@@ -350,8 +350,9 @@
   body.lock-full .need-full{display:none;}
   body.lock-prof .cell-prof{display:none;}
   body.lock-press .cell-press{display:none;}
-  /* dans les abysses, profondeur et pression remplacent la cellule technique */
-  body.monde-abysses .cell-fps{display:none;}
+  /* dans les abysses, profondeur et pression remplacent la cellule technique ;
+     la frise est inutile puisque la descente elle-même montre l'avancement */
+  body.monde-abysses .cell-fps,body.monde-abysses .day{display:none;}
 
   /* ---------- compteur de tokens ---------- */
   .tokBtn{
@@ -404,10 +405,10 @@
     background:rgba(3,20,32,.66);border-color:#1C5B78;
   }
   /* paliers = remontée vers la lumière, pas escalade du danger */
-  body.monde-abysses.jaune {--glow:#35D6E8;--magenta:#7FE9F5;}
-  body.monde-abysses.orange{--glow:#5BE8B0;--magenta:#9FF2D2;}
-  body.monde-abysses.rouge {--glow:#A8E85B;--magenta:#CBF29A;}
-  body.monde-abysses.violet{--glow:#FFD86B;--magenta:#FFE9A8;}
+  body.monde-abysses.jaune {--glow:#2FA6E0;--magenta:#7FD0F5;}
+  body.monde-abysses.orange{--glow:#3F72DC;--magenta:#8FAEF2;}
+  body.monde-abysses.rouge {--glow:#6B54E4;--magenta:#A99AF5;}
+  body.monde-abysses.violet{--glow:#3BF0A8;--magenta:#9BFAD6;}
   body.monde-abysses .libre{color:#EAFBFF;text-shadow:0 0 60px #7FE9F5;}
   /* l'eau claire délave le texte : on le rehausse */
   body.monde-abysses .eyebrow{color:#BFE8F5;text-shadow:0 2px 10px rgba(0,20,34,.9);}
@@ -657,8 +658,10 @@
       // On démarre avec un simple fond marin ensoleillé ; tout le reste s'achète,
       // y compris le plongeur et les profondeurs qui allongent la remontée.
       nom: "Abysses", icone: "🌊", monnaie: "🫧",
-      paliers: { base:"#2FE0C8", jaune:"#35D6E8", orange:"#5BE8B0",
-                 rouge:"#A8E85B", violet:"#FFD86B" },
+      // on s'enfonce : le turquoise de surface glisse vers le bleu profond,
+      // puis vers la bioluminescence, seule lumière du fond
+      paliers: { base:"#35D6E8", jaune:"#2FA6E0", orange:"#3F72DC",
+                 rouge:"#6B54E4", violet:"#3BF0A8" },
       competences: [
         { id:"start",  nom:"Fond marin",           cout:0,   pre:null,     row:1, col:3 },
 
@@ -958,71 +961,153 @@
   }
 
   /* ================= MONDE 2 : les abysses =================
-     Au départ : un simple fond marin ensoleillé. Tout s'achète — le plongeur,
-     la faune, le décor, et les profondeurs qui font démarrer la plongée plus bas.
-     La journée est une remontée : le matin on est au fond, le soir en surface. */
-  const PROFONDEURS = [                    // palier acheté → profondeur de départ (m)
+     La journée est une DESCENTE : on quitte le bateau le matin en surface et on
+     atteint le fond le soir. Acheter une profondeur allonge la plongée.
+     La faune est zonée : on ne croise que les espèces de la profondeur courante,
+     ce qui évite d'avoir tout l'océan à l'écran en même temps. */
+  const PROFONDEURS = [                    // palier acheté → fond atteint (m)
     { id:"violet", m:1800 }, { id:"rouge", m:600 },
     { id:"orange", m:200 },  { id:"jaune", m:80 }
   ];
   const profMax = () => (PROFONDEURS.find(z => aDebloque(z.id)) || { m:30 }).m;
 
-  const plancton = [], poissons = [], meduses = [], bulles = [], herbes = [];
+  // zone biologique selon la profondeur : détermine QUI on croise
+  function zoneDe(m){
+    if (m < 45)  return "recif";      // eaux claires, poissons vifs
+    if (m < 250) return "large";      // pleine eau, poissons argentés
+    if (m < 900) return "meduses";    // pénombre, méduses
+    return "abysse";                  // nuit totale, poissons-lanternes
+  }
+
+  const plancton = [], nageurs = [], bulles = [], herbes = [];
   let baleine = null, abyssPret = false;
 
-  const seedPoisson = () => {
+  // enPlace : répartir d'emblée sur la largeur, sinon la zone paraît vide au changement
+  const seedNageur = (zone, enPlace) => {
     const versDroite = Math.random() < .5;
-    return { x: versDroite ? -60 * dpr : W + 60 * dpr, y: Math.random() * Hh,
-             dir: versDroite ? 1 : -1, v: (Math.random() * 1.2 + .5) * dpr,
-             t: (Math.random() * 9 + 7) * dpr, ph: Math.random() * 6.3,
-             h: 18 + Math.random() * 42 };
+    return { x: enPlace ? Math.random() * W : (versDroite ? -70 * dpr : W + 70 * dpr),
+             y: Hh * (.08 + Math.random() * .84),
+             dir: versDroite ? 1 : -1,
+             v: (Math.random() * .9 + .35) * dpr,
+             t: (Math.random() * 8 + 9) * dpr,
+             ph: Math.random() * 6.3, zone,
+             teinte: 24 + Math.random() * 34 };
   };
-  const seedMeduse = () => ({ x: Math.random() * W, y: Math.random() * Hh,
-                              r: (Math.random() * 13 + 9) * dpr,
-                              v: (Math.random() * .3 + .12) * dpr, ph: Math.random() * 6.3 });
   function initAbysses(){
     if (abyssPret) return;
     abyssPret = true;
-    for (let i = 0; i < 110; i++)
+    for (let i = 0; i < 70; i++)
       plancton.push({ x: Math.random() * W, y: Math.random() * Hh,
-                      r: (Math.random() * 1.5 + .4) * dpr,
-                      v: (Math.random() * .45 + .15) * dpr, a: Math.random() * .45 + .15 });
-    for (let i = 0; i < 16; i++) poissons.push(seedPoisson());
-    for (let i = 0; i < 8; i++)  meduses.push(seedMeduse());
-    for (let i = 0; i < 26; i++)
-      herbes.push({ x: Math.random() * W, h: (Math.random() * 60 + 34) * dpr,
-                    ph: Math.random() * 6.3, w: (Math.random() * 3 + 2) * dpr });
+                      r: (Math.random() * 1.3 + .35) * dpr,
+                      v: (Math.random() * .4 + .12) * dpr, a: Math.random() * .4 + .12 });
+    for (let i = 0; i < 24; i++)
+      herbes.push({ x: Math.random() * W, h: (Math.random() * 70 + 40) * dpr,
+                    ph: Math.random() * 6.3, w: (Math.random() * 3 + 2.5) * dpr });
   }
   const mix = (a, b, t) => a.map((v, i) => Math.round(v + (b[i] - v) * t));
+
+  /* ---- dessins des créatures, chacun avec sa silhouette ---- */
+  function poissonRecif(c, s, clarte){         // corps rond, queue en éventail, rayé
+    c.fillStyle = "hsla(" + (28 + s.teinte) + ",85%," + (46 + clarte * 18) + "%,.95)";
+    c.beginPath(); c.ellipse(0, 0, s.t, s.t * .58, 0, 0, 6.283); c.fill();
+    c.beginPath(); c.moveTo(-s.t * .92, 0);
+    c.lineTo(-s.t * 1.75, -s.t * .62); c.lineTo(-s.t * 1.62, 0);
+    c.lineTo(-s.t * 1.75, s.t * .62); c.closePath(); c.fill();
+    c.fillStyle = "rgba(255,255,255,.30)";      // rayures
+    for (let k = -1; k <= 1; k++){
+      c.beginPath(); c.ellipse(k * s.t * .34, 0, s.t * .10, s.t * .5, 0, 0, 6.283); c.fill();
+    }
+    c.beginPath(); c.arc(s.t * .62, -s.t * .16, s.t * .12, 0, 6.283);   // œil
+    c.fillStyle = "rgba(10,20,30,.9)"; c.fill();
+  }
+  function poissonLarge(c, s, clarte){         // fuselé, argenté, queue fourchue
+    const g = c.createLinearGradient(0, -s.t * .4, 0, s.t * .4);
+    g.addColorStop(0, "rgba(206,226,238," + (.5 + clarte * .4) + ")");
+    g.addColorStop(1, "rgba(96,132,158," + (.5 + clarte * .4) + ")");
+    c.fillStyle = g;
+    c.beginPath(); c.ellipse(0, 0, s.t * 1.35, s.t * .34, 0, 0, 6.283); c.fill();
+    c.beginPath(); c.moveTo(-s.t * 1.3, 0);
+    c.lineTo(-s.t * 2.1, -s.t * .5); c.lineTo(-s.t * 1.72, 0);
+    c.lineTo(-s.t * 2.1, s.t * .5); c.closePath(); c.fill();
+    c.beginPath(); c.moveTo(-s.t * .1, -s.t * .32);                     // aileron dorsal
+    c.lineTo(s.t * .3, -s.t * .78); c.lineTo(s.t * .5, -s.t * .28); c.closePath(); c.fill();
+  }
+  function meduse(c, s, t0){                   // ombrelle translucide + tentacules
+    const pulse = 1 + Math.sin(t0 * 1.5 + s.ph) * .13, R = s.t * 1.15;
+    c.globalCompositeOperation = "lighter";
+    c.fillStyle = "rgba(140,120,255,.16)";
+    c.beginPath(); c.arc(0, 0, R * 2.2 * pulse, 0, 6.283); c.fill();
+    const g = c.createLinearGradient(0, -R, 0, R * .8);
+    g.addColorStop(0, "rgba(226,214,255,.72)");
+    g.addColorStop(1, "rgba(150,120,235,.16)");
+    c.fillStyle = g;
+    c.beginPath(); c.ellipse(0, 0, R * pulse, R * .78 * pulse, 0, Math.PI, 0); c.fill();
+    c.strokeStyle = "rgba(206,190,255,.5)"; c.lineWidth = 1.6 * dpr; c.lineCap = "round";
+    for (let k = -2; k <= 2; k++){
+      c.beginPath(); c.moveTo(k * R * .3, R * .1);
+      c.quadraticCurveTo(k * R * .48 + Math.sin(t0 * 2.2 + k + s.ph) * 7 * dpr, R * 1.5,
+                         k * R * .32, R * 2.6);
+      c.stroke();
+    }
+    c.globalCompositeOperation = "source-over";
+  }
+  function poissonLanterne(c, s, t0){          // corps trapu, mâchoire, leurre lumineux
+    const L = s.t * 1.1;
+    c.fillStyle = "rgba(8,12,22,.96)";
+    c.beginPath(); c.ellipse(0, 0, L, L * .72, 0, 0, 6.283); c.fill();
+    c.beginPath(); c.moveTo(-L * .95, 0);                                 // queue
+    c.lineTo(-L * 1.7, -L * .5); c.lineTo(-L * 1.7, L * .5); c.closePath(); c.fill();
+    c.fillStyle = "rgba(230,244,255,.85)";                                // dents
+    for (let k = 0; k < 5; k++){
+      const x = L * (.18 + k * .16);
+      c.beginPath(); c.moveTo(x, L * .3); c.lineTo(x + L * .07, L * .05);
+      c.lineTo(x + L * .14, L * .3); c.closePath(); c.fill();
+    }
+    c.strokeStyle = "rgba(10,16,26,.96)"; c.lineWidth = 2.2 * dpr;        // tige du leurre
+    c.beginPath(); c.moveTo(L * .25, -L * .55);
+    c.quadraticCurveTo(L * 1.25, -L * 1.5, L * 1.5, -L * .55); c.stroke();
+    const pulse = .55 + Math.sin(t0 * 3 + s.ph) * .45;                    // leurre qui palpite
+    c.globalCompositeOperation = "lighter";
+    c.fillStyle = "rgba(140,255,220," + (.16 * pulse) + ")";
+    c.beginPath(); c.arc(L * 1.5, -L * .55, L * 1.5, 0, 6.283); c.fill();
+    c.fillStyle = "rgba(200,255,240," + (.55 + .4 * pulse) + ")";
+    c.beginPath(); c.arc(L * 1.5, -L * .55, L * .22, 0, 6.283); c.fill();
+    c.globalCompositeOperation = "source-over";
+    c.fillStyle = "rgba(150,240,255,.8)";                                 // œil
+    c.beginPath(); c.arc(L * .45, -L * .18, L * .11, 0, 6.283); c.fill();
+  }
 
   let profM = 0;                            // profondeur courante, lue par la télémétrie
   function dessineAbysses(prog, enPause, alerte, libre){
     initAbysses();
-    const p = libre ? 1 : Math.max(0, Math.min(1, prog));
+    const p = Math.max(0, Math.min(1, prog));
     const lent = reduce ? .35 : 1;
-    const monte = enPause ? .12 : 1;              // au palier de déco, on stagne
     const PM = profMax();
-    profM = libre ? 0 : PM * (1 - p);
-    // échelle adaptée à la profondeur du monde : la remontée occupe toujours l'écran,
-    // sinon à −1800 m le fond disparaîtrait en une minute.
-    const ppm = Hh * .42 / PM;
+    profM = PM * p;                          // on DESCEND : 0 le matin, PM le soir
     const t0 = performance.now() / 1000;
+    const zone = zoneDe(profM);
 
-    // clarté perceptive : décroît vite près de la surface, lentement en profondeur
-    const clarte = Math.max(.05, 1 / (1 + profM / 60));
+    // l'eau s'assombrit avec la profondeur
+    const clarte = Math.max(.04, 1 / (1 + profM / 55));
     const g = ctx.createLinearGradient(0, 0, 0, Hh);
-    g.addColorStop(0, "rgb(" + mix([2, 12, 28], [86, 206, 226], clarte) + ")");
-    g.addColorStop(1, "rgb(" + mix([0, 2, 6], [10, 92, 132], clarte) + ")");
+    g.addColorStop(0, "rgb(" + mix([1, 8, 18], [96, 214, 232], clarte) + ")");
+    g.addColorStop(1, "rgb(" + mix([0, 2, 6], [14, 104, 146], clarte) + ")");
     ctx.fillStyle = g; ctx.fillRect(0, 0, W, Hh);
 
-    // rais de lumière venus de la surface
-    if (clarte > .04){
+    // géométrie verticale : le plongeur est fixe, surface et fond défilent.
+    // SPAN large = la surface quitte l'écran tôt, le fond n'arrive qu'à la fin.
+    const dy = Hh * .46, SPAN = Hh * 3;
+    const surfY = dy - p * SPAN;
+    const solY  = dy + (1 - p) * SPAN;
+
+    // rais de lumière, seulement tant qu'on est assez haut
+    if (clarte > .12){
       ctx.globalCompositeOperation = "lighter";
-      for (let i = 0; i < 5; i++){
-        const x = W * (.12 + i * .19) + Math.sin(t0 * .25 + i) * 40 * dpr;
-        const w = (36 + Math.sin(t0 * .4 + i * 2) * 14) * dpr;
+      for (let i = 0; i < 4; i++){
+        const x = W * (.16 + i * .24) + Math.sin(t0 * .25 + i) * 40 * dpr;
+        const w = (34 + Math.sin(t0 * .4 + i * 2) * 12) * dpr;
         const gr = ctx.createLinearGradient(x, 0, x + w * .6, Hh);
-        gr.addColorStop(0, "rgba(190,245,255," + (.05 + clarte * .17) + ")");
+        gr.addColorStop(0, "rgba(190,245,255," + (.04 + clarte * .14) + ")");
         gr.addColorStop(1, "rgba(190,245,255,0)");
         ctx.fillStyle = gr;
         ctx.beginPath();
@@ -1033,178 +1118,194 @@
       ctx.globalCompositeOperation = "source-over";
     }
 
-    // plancton : il descend puisqu'on monte
+    // plancton : il monte puisqu'on descend
     for (const q of plancton){
-      q.y += q.v * lent * monte;
-      if (q.y > Hh + 4){ q.y = -4; q.x = Math.random() * W; }
-      ctx.fillStyle = "rgba(200,240,255," + (q.a * (.25 + clarte * .5)) + ")";
+      q.y -= q.v * lent * (enPause ? .12 : 1);
+      if (q.y < -4){ q.y = Hh + 4; q.x = Math.random() * W; }
+      ctx.fillStyle = "rgba(200,240,255," + (q.a * (.2 + clarte * .45)) + ")";
       ctx.beginPath(); ctx.arc(q.x, q.y, q.r, 0, 6.283); ctx.fill();
     }
 
-    // le fond marin s'éloigne à mesure qu'on s'élève au-dessus de lui
-    const solY = Hh * .80 + (PM - profM) * ppm;
-    if (solY < Hh + 40 * dpr){
-      ctx.fillStyle = "rgb(" + mix([18, 22, 30], [222, 202, 150], clarte) + ")";
-      ctx.beginPath(); ctx.moveTo(0, Hh); ctx.lineTo(0, solY + 12 * dpr);
-      for (let x = 0; x <= W; x += 26 * dpr)
-        ctx.lineTo(x, solY + Math.sin(x * .012) * 9 * dpr);
-      ctx.lineTo(W, Hh); ctx.closePath(); ctx.fill();
-
-      if (aDebloque("algues")){                    // herbier qui ondule
-        ctx.strokeStyle = "rgba(" + mix([20, 60, 50], [58, 168, 96], clarte) + ",.85)";
-        ctx.lineCap = "round";
-        for (const hb of herbes){
-          const base = solY + Math.sin(hb.x * .012) * 9 * dpr;
-          ctx.lineWidth = hb.w;
-          ctx.beginPath(); ctx.moveTo(hb.x, base);
-          ctx.quadraticCurveTo(hb.x + Math.sin(t0 * 1.1 + hb.ph) * 16 * dpr, base - hb.h * .6,
-                               hb.x + Math.sin(t0 * 1.1 + hb.ph) * 24 * dpr, base - hb.h);
-          ctx.stroke();
-        }
-      }
-      if (aDebloque("tresor")){                    // coffre au trésor, luisant
-        const cx = W * .74, cy = solY + Math.sin(cx * .012) * 9 * dpr - 15 * dpr, s = dpr;
-        ctx.fillStyle = "rgb(" + mix([30, 26, 20], [104, 68, 34], clarte) + ")";
-        ctx.fillRect(cx - 26 * s, cy - 2 * s, 52 * s, 20 * s);
-        ctx.beginPath(); ctx.ellipse(cx, cy - 2 * s, 26 * s, 13 * s, 0, Math.PI, 0); ctx.fill();
-        ctx.fillStyle = "rgb(" + mix([60, 50, 20], [226, 178, 58], clarte) + ")";
-        ctx.fillRect(cx - 26 * s, cy - 4 * s, 52 * s, 4 * s);
-        ctx.fillRect(cx - 4 * s, cy - 2 * s, 8 * s, 12 * s);
-        ctx.globalCompositeOperation = "lighter";      // éclat de l'or
-        ctx.fillStyle = "rgba(255,220,120," + (.16 + Math.sin(t0 * 2) * .05) + ")";
-        ctx.beginPath(); ctx.arc(cx, cy, 34 * s, 0, 6.283); ctx.fill();
-        ctx.globalCompositeOperation = "source-over";
-      }
-    }
-
-    // faune
-    if (aDebloque("bg")){
-      const n = aDebloque("orange") ? poissons.length : 6;   // « bancs » = plus de poissons
-      for (let i = 0; i < n; i++){
-        const f = poissons[i];
-        f.x += f.v * f.dir * lent;
-        f.y += Math.sin(t0 * 2 + f.ph) * .4 * dpr;
-        if (f.dir > 0 ? f.x > W + 70 * dpr : f.x < -70 * dpr) Object.assign(f, seedPoisson());
-        ctx.save(); ctx.translate(f.x, f.y); ctx.scale(f.dir, 1);
-        ctx.fillStyle = "hsla(" + f.h + ",70%," + (34 + clarte * 34) + "%," + (.45 + clarte * .4) + ")";
-        ctx.beginPath(); ctx.ellipse(0, 0, f.t, f.t * .42, 0, 0, 6.283); ctx.fill();
-        ctx.beginPath(); ctx.moveTo(-f.t, 0);
-        ctx.lineTo(-f.t * 1.7, -f.t * .42); ctx.lineTo(-f.t * 1.7, f.t * .42);
-        ctx.closePath(); ctx.fill();
-        ctx.restore();
-      }
-    }
-    if (aDebloque("rouge")){                       // méduses bioluminescentes
-      for (const m of meduses){
-        m.y -= m.v * lent * .5;
-        if (m.y < -40 * dpr){ m.y = Hh + 40 * dpr; m.x = Math.random() * W; }
-        const pulse = 1 + Math.sin(t0 * 1.6 + m.ph) * .12;
-        ctx.globalCompositeOperation = "lighter";
-        ctx.fillStyle = "rgba(150,110,255,.20)";
-        ctx.beginPath(); ctx.arc(m.x, m.y, m.r * 2.1 * pulse, 0, 6.283); ctx.fill();
-        ctx.fillStyle = "rgba(200,170,255,.55)";
-        ctx.beginPath(); ctx.ellipse(m.x, m.y, m.r * pulse, m.r * .72 * pulse, 0, Math.PI, 0);
-        ctx.fill();
-        ctx.strokeStyle = "rgba(190,160,255,.4)"; ctx.lineWidth = 1.4 * dpr;
-        for (let k = -2; k <= 2; k++){
-          ctx.beginPath(); ctx.moveTo(m.x + k * m.r * .32, m.y);
-          ctx.quadraticCurveTo(m.x + k * m.r * .5 + Math.sin(t0 * 2 + k) * 5 * dpr,
-                               m.y + m.r * 1.5, m.x + k * m.r * .34, m.y + m.r * 2.4);
-          ctx.stroke();
-        }
-        ctx.globalCompositeOperation = "source-over";
-      }
-    }
-    if (aDebloque("violet")){                      // la baleine, passage rare
-      if (!baleine && Math.random() < .0016)
-        baleine = { x: -320 * dpr, y: Hh * (.2 + Math.random() * .5), v: .9 * dpr };
-      if (baleine){
-        baleine.x += baleine.v * lent;
-        if (baleine.x > W + 340 * dpr) baleine = null;
-        else {
-          const b = baleine, L = 250 * dpr, H2 = 62 * dpr;
-          ctx.fillStyle = "rgba(12,40,66," + (.5 + clarte * .25) + ")";
-          ctx.beginPath(); ctx.ellipse(b.x, b.y, L * .5, H2 * .5, 0, 0, 6.283); ctx.fill();
-          ctx.beginPath(); ctx.moveTo(b.x - L * .5, b.y);
-          ctx.lineTo(b.x - L * .78, b.y - H2 * .55);
-          ctx.lineTo(b.x - L * .74, b.y + H2 * .5); ctx.closePath(); ctx.fill();
-          ctx.fillStyle = "rgba(150,220,245," + (.2 + clarte * .2) + ")";
-          ctx.beginPath(); ctx.ellipse(b.x + L * .1, b.y + H2 * .22, L * .34, H2 * .2, 0, 0, 6.283);
-          ctx.fill();
-        }
-      }
-    }
-
-    // la surface, et le bateau qui s'y balance
-    const surfY = Hh * .22 - profM * ppm;
-    if (surfY > -140 * dpr){
-      const sg = ctx.createLinearGradient(0, surfY - 110 * dpr, 0, surfY);
+    // ---- la surface et le bateau, visibles seulement au tout début ----
+    if (surfY > -120 * dpr){
+      const sg = ctx.createLinearGradient(0, surfY - 130 * dpr, 0, surfY);
       sg.addColorStop(0, "rgba(255,255,255,.5)");
       sg.addColorStop(1, "rgba(200,248,255,0)");
-      ctx.fillStyle = sg; ctx.fillRect(0, surfY - 110 * dpr, W, 110 * dpr);
-      ctx.strokeStyle = "rgba(240,255,255,.8)"; ctx.lineWidth = 2 * dpr;
+      ctx.fillStyle = sg; ctx.fillRect(0, surfY - 130 * dpr, W, 130 * dpr);
+      ctx.strokeStyle = "rgba(240,255,255,.85)"; ctx.lineWidth = 2.4 * dpr;
       ctx.beginPath();
       for (let x = 0; x <= W; x += 12 * dpr)
         ctx.lineTo(x, surfY + Math.sin(x * .015 + t0 * 2.2) * 5 * dpr);
       ctx.stroke();
 
-      if (aDebloque("boat")){
-        const bx = W * .32 + Math.sin(t0 * .6) * 12 * dpr;
+      if (aDebloque("boat")){                 // coque + cabine + mât, vus d'en dessous
+        const bx = W * .13 + Math.sin(t0 * .6) * 14 * dpr;   // dégagé du compteur
         const by = surfY + Math.sin(bx * .015 + t0 * 2.2) * 5 * dpr;
         ctx.save(); ctx.translate(bx, by); ctx.rotate(Math.sin(t0 * .9) * .05);
-        ctx.fillStyle = "rgba(16,32,48,.9)";
-        ctx.beginPath(); ctx.moveTo(-46 * dpr, 0); ctx.lineTo(46 * dpr, 0);
-        ctx.lineTo(30 * dpr, 17 * dpr); ctx.lineTo(-32 * dpr, 17 * dpr);
+        ctx.fillStyle = "rgba(10,24,38,.95)";
+        ctx.beginPath(); ctx.moveTo(-52 * dpr, 0); ctx.lineTo(52 * dpr, 0);
+        ctx.quadraticCurveTo(40 * dpr, 22 * dpr, -28 * dpr, 20 * dpr);
         ctx.closePath(); ctx.fill();
-        ctx.fillRect(-6 * dpr, -30 * dpr, 3 * dpr, 30 * dpr);
+        ctx.fillStyle = "rgba(18,40,60,.95)";
+        ctx.fillRect(-16 * dpr, -20 * dpr, 30 * dpr, 20 * dpr);           // cabine
+        ctx.fillRect(24 * dpr, -44 * dpr, 3.5 * dpr, 44 * dpr);           // mât
         ctx.restore();
       }
     }
 
-    // le plongeur, s'il est débloqué
+    // ---- le fond, qui n'apparaît qu'en fin de journée ----
+    if (solY < Hh + 60 * dpr){
+      ctx.fillStyle = "rgb(" + mix([14, 18, 26], [226, 206, 156], clarte) + ")";
+      ctx.beginPath(); ctx.moveTo(0, Hh); ctx.lineTo(0, solY + 14 * dpr);
+      for (let x = 0; x <= W; x += 24 * dpr)
+        ctx.lineTo(x, solY + Math.sin(x * .011) * 11 * dpr);
+      ctx.lineTo(W, Hh); ctx.closePath(); ctx.fill();
+
+      if (aDebloque("algues")){
+        ctx.strokeStyle = "rgba(" + mix([16, 52, 46], [56, 164, 96], clarte) + ",.9)";
+        ctx.lineCap = "round";
+        for (const hb of herbes){
+          const base = solY + Math.sin(hb.x * .011) * 11 * dpr;
+          ctx.lineWidth = hb.w;
+          ctx.beginPath(); ctx.moveTo(hb.x, base);
+          ctx.quadraticCurveTo(hb.x + Math.sin(t0 * 1.1 + hb.ph) * 18 * dpr, base - hb.h * .58,
+                               hb.x + Math.sin(t0 * 1.1 + hb.ph) * 27 * dpr, base - hb.h);
+          ctx.stroke();
+        }
+      }
+      if (aDebloque("tresor")){               // coffre ouvert, or qui déborde
+        // à droite du compteur : au centre, le coffre passerait sous les chiffres
+        const cx = W * .87, cy = solY + Math.sin(cx * .011) * 11 * dpr - 16 * dpr, s = dpr;
+        ctx.save(); ctx.translate(cx, cy);
+        ctx.fillStyle = "rgb(" + mix([26, 22, 18], [96, 62, 32], clarte) + ")";
+        ctx.fillRect(-28 * s, 0, 56 * s, 22 * s);                          // caisse
+        ctx.save(); ctx.rotate(-.42);                                      // couvercle ouvert
+        ctx.beginPath(); ctx.ellipse(-6 * s, -8 * s, 28 * s, 14 * s, 0, Math.PI, 0); ctx.fill();
+        ctx.restore();
+        ctx.fillStyle = "rgb(" + mix([56, 46, 20], [214, 172, 62], clarte) + ")";
+        ctx.fillRect(-28 * s, -3 * s, 56 * s, 5 * s);                      // ferrure
+        for (let k = 0; k < 7; k++){                                       // pièces
+          ctx.beginPath();
+          ctx.ellipse(-20 * s + k * 7 * s, -6 * s + Math.sin(k * 2.1) * 3 * s,
+                      4.4 * s, 2.6 * s, 0, 0, 6.283);
+          ctx.fill();
+        }
+        ctx.globalCompositeOperation = "lighter";
+        ctx.fillStyle = "rgba(255,214,110," + (.14 + Math.sin(t0 * 2) * .05) + ")";
+        ctx.beginPath(); ctx.arc(0, 0, 46 * s, 0, 6.283); ctx.fill();
+        ctx.globalCompositeOperation = "source-over";
+        ctx.restore();
+      }
+    }
+
+    // ---- faune de la zone courante uniquement ----
+    if (aDebloque("bg")){
+      const zoneOk = { recif:true, large:true,
+                       meduses:aDebloque("rouge"), abysse:aDebloque("rouge") }[zone];
+      const cible = zoneOk ? (aDebloque("orange") ? 9 : 5) : 0;
+      // renouveler la population quand on change de zone
+      for (let i = nageurs.length - 1; i >= 0; i--)
+        if (nageurs[i].zone !== zone) nageurs.splice(i, 1);
+      while (nageurs.length < cible) nageurs.push(seedNageur(zone, true));
+      while (nageurs.length > cible) nageurs.pop();
+
+      for (const s of nageurs){
+        s.x += s.v * s.dir * lent;
+        s.y += Math.sin(t0 * 1.6 + s.ph) * .5 * dpr;
+        if (s.dir > 0 ? s.x > W + 90 * dpr : s.x < -90 * dpr) Object.assign(s, seedNageur(zone));
+        ctx.save(); ctx.translate(s.x, s.y); ctx.scale(s.dir, 1);
+        if (zone === "recif")        poissonRecif(ctx, s, clarte);
+        else if (zone === "large")   poissonLarge(ctx, s, clarte);
+        else if (zone === "meduses") meduse(ctx, s, t0);
+        else                         poissonLanterne(ctx, s, t0);
+        ctx.restore();
+      }
+    }
+    if (aDebloque("violet") && zone !== "recif"){       // la baleine, passage rare
+      if (!baleine && Math.random() < .0014)
+        baleine = { x: -340 * dpr, y: Hh * (.14 + Math.random() * .6), v: .85 * dpr };
+      if (baleine){
+        baleine.x += baleine.v * lent;
+        if (baleine.x > W + 360 * dpr) baleine = null;
+        else {
+          const b = baleine, L = 270 * dpr, H2 = 66 * dpr;
+          ctx.save(); ctx.translate(b.x, b.y);
+          ctx.fillStyle = "rgba(10,32,54," + (.45 + clarte * .3) + ")";
+          ctx.beginPath(); ctx.moveTo(L * .5, 0);
+          ctx.quadraticCurveTo(L * .1, -H2 * .55, -L * .42, -H2 * .3);
+          ctx.quadraticCurveTo(-L * .58, -H2 * .1, -L * .5, 0);
+          ctx.quadraticCurveTo(-L * .58, H2 * .16, -L * .42, H2 * .34);
+          ctx.quadraticCurveTo(L * .1, H2 * .6, L * .5, 0);
+          ctx.closePath(); ctx.fill();
+          ctx.beginPath(); ctx.moveTo(-L * .46, 0);                        // nageoire caudale
+          ctx.lineTo(-L * .8, -H2 * .6); ctx.lineTo(-L * .68, 0);
+          ctx.lineTo(-L * .8, H2 * .6); ctx.closePath(); ctx.fill();
+          ctx.beginPath(); ctx.moveTo(-L * .02, H2 * .28);                 // pectorale
+          ctx.lineTo(-L * .2, H2 * .78); ctx.lineTo(L * .1, H2 * .38); ctx.closePath(); ctx.fill();
+          ctx.restore();
+        }
+      }
+    }
+
+    // ---- le plongeur : il descend, tête en bas ----
     if (aDebloque("diver")){
-      // sur la gauche : au centre il passerait sous les chiffres, à droite sous la télémétrie
-      const dx = W * .15, dy = libre ? Hh * .16 : Hh * .52;
-      ctx.save(); ctx.translate(dx, dy); ctx.rotate(-.35 + Math.sin(t0 * 1.2) * .06);
-      ctx.fillStyle = "rgba(4,14,26,.92)";
-      ctx.beginPath(); ctx.ellipse(0, 0, 26 * dpr, 11 * dpr, 0, 0, 6.283); ctx.fill();
-      ctx.beginPath(); ctx.arc(24 * dpr, -5 * dpr, 9 * dpr, 0, 6.283); ctx.fill();
-      ctx.fillRect(-14 * dpr, -18 * dpr, 16 * dpr, 12 * dpr);
-      ctx.beginPath(); ctx.moveTo(-24 * dpr, 2 * dpr);
-      ctx.lineTo(-44 * dpr, -8 * dpr); ctx.lineTo(-42 * dpr, 10 * dpr); ctx.closePath(); ctx.fill();
-      ctx.fillStyle = "rgba(" + accent().map(Math.round) + ",.9)";
-      ctx.beginPath(); ctx.arc(28 * dpr, -6 * dpr, 4.5 * dpr, 0, 6.283); ctx.fill();
+      const dxp = W * .17, tang = Math.sin(t0 * 1.1) * .07;
+      ctx.save(); ctx.translate(dxp, dy); ctx.rotate(.42 + tang);
+      ctx.fillStyle = "rgba(6,16,28,.95)";
+      ctx.beginPath(); ctx.ellipse(0, 0, 25 * dpr, 10 * dpr, 0, 0, 6.283); ctx.fill();   // torse
+      ctx.beginPath(); ctx.arc(23 * dpr, -3 * dpr, 8.5 * dpr, 0, 6.283); ctx.fill();     // tête
+      ctx.fillStyle = "rgba(16,34,52,.95)";
+      ctx.fillRect(-16 * dpr, -17 * dpr, 18 * dpr, 13 * dpr);                            // bloc
+      ctx.fillStyle = "rgba(6,16,28,.95)";
+      ctx.beginPath(); ctx.moveTo(-22 * dpr, -2 * dpr);                                  // jambes
+      ctx.lineTo(-40 * dpr, -7 * dpr); ctx.lineTo(-40 * dpr, 4 * dpr); ctx.closePath(); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(-38 * dpr, -8 * dpr);                                  // palmes
+      ctx.lineTo(-58 * dpr, -16 * dpr); ctx.lineTo(-52 * dpr, -2 * dpr); ctx.closePath(); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(-38 * dpr, 3 * dpr);
+      ctx.lineTo(-56 * dpr, 12 * dpr); ctx.lineTo(-50 * dpr, -1 * dpr); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = "rgba(" + accent().map(Math.round) + ",.95)";                      // masque
+      ctx.beginPath(); ctx.ellipse(27 * dpr, -4 * dpr, 5.5 * dpr, 4 * dpr, 0, 0, 6.283); ctx.fill();
       ctx.restore();
 
-      if (bulles.length < 90 && Math.random() < (enPause ? .25 : .55))
-        bulles.push({ x: dx + 24 * dpr + (Math.random() - .5) * 10 * dpr, y: dy - 12 * dpr,
-                      r: (Math.random() * 3.4 + 1.2) * dpr,
-                      v: (Math.random() * 1.5 + .9) * dpr, ph: Math.random() * 6.3 });
-    } else if (bulles.length < 8 && Math.random() < .05){
-      // sans plongeur : deux ou trois bulles qui montent du sable
-      bulles.push({ x: Math.random() * W, y: Hh, r: (Math.random() * 2.6 + 1) * dpr,
-                    v: (Math.random() * 1.1 + .6) * dpr, ph: Math.random() * 6.3 });
+      // lampe frontale dans le noir
+      if (clarte < .3){
+        ctx.globalCompositeOperation = "lighter";
+        const lg = ctx.createRadialGradient(dxp + 30 * dpr, dy + 10 * dpr, 0,
+                                            dxp + 30 * dpr, dy + 10 * dpr, 230 * dpr);
+        lg.addColorStop(0, "rgba(190,240,255,.20)");
+        lg.addColorStop(1, "rgba(190,240,255,0)");
+        ctx.fillStyle = lg; ctx.fillRect(0, 0, W, Hh);
+        ctx.globalCompositeOperation = "source-over";
+      }
+
+      if (bulles.length < 40 && Math.random() < (enPause ? .2 : .4))
+        bulles.push({ x: dxp + 22 * dpr + (Math.random() - .5) * 10 * dpr, y: dy - 10 * dpr,
+                      r: (Math.random() * 3 + 1.2) * dpr,
+                      v: (Math.random() * 1.4 + .9) * dpr, ph: Math.random() * 6.3 });
+    } else if (bulles.length < 6 && Math.random() < .04){
+      bulles.push({ x: Math.random() * W, y: Hh, r: (Math.random() * 2.4 + 1) * dpr,
+                    v: (Math.random() * 1 + .6) * dpr, ph: Math.random() * 6.3 });
     }
     for (let i = bulles.length - 1; i >= 0; i--){
       const b = bulles[i];
-      b.y -= b.v * lent; b.x += Math.sin(b.y * .04 + b.ph) * .7 * dpr;
+      b.y -= b.v * lent; b.x += Math.sin(b.y * .04 + b.ph) * .6 * dpr;
       if (b.y < -10){ bulles.splice(i, 1); continue; }
-      ctx.strokeStyle = "rgba(225,250,255,.55)"; ctx.lineWidth = 1.2 * dpr;
+      ctx.strokeStyle = "rgba(225,250,255,.5)"; ctx.lineWidth = 1.2 * dpr;
       ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, 6.283); ctx.stroke();
     }
 
-    // voile central : en eau claire, le texte cyan deviendrait illisible sans lui
+    // voile central : sans lui le texte serait illisible en eau claire
     const vg = ctx.createRadialGradient(W * .5, Hh * .42, 0, W * .5, Hh * .42, Math.max(W, Hh) * .55);
-    vg.addColorStop(0, "rgba(1,14,24," + (.34 * clarte + .10) + ")");
-    vg.addColorStop(1, "rgba(1,14,24,0)");
+    vg.addColorStop(0, "rgba(1,12,22," + (.30 * clarte + .12) + ")");
+    vg.addColorStop(1, "rgba(1,12,22,0)");
     ctx.fillStyle = vg; ctx.fillRect(0, 0, W, Hh);
 
-    // libération : on crève la surface
+    // fin de journée : on touche le fond, la lampe éclaire le sable
     if (libre){
       ctx.globalCompositeOperation = "lighter";
-      const s = ctx.createRadialGradient(W * .5, Hh * .06, 0, W * .5, Hh * .06, Hh);
-      s.addColorStop(0, "rgba(255,255,235,.5)");
-      s.addColorStop(1, "rgba(255,255,235,0)");
+      const s = ctx.createRadialGradient(W * .5, Hh * .7, 0, W * .5, Hh * .7, Hh * .9);
+      s.addColorStop(0, "rgba(190,235,255,.22)");
+      s.addColorStop(1, "rgba(190,235,255,0)");
       ctx.fillStyle = s; ctx.fillRect(0, 0, W, Hh);
       ctx.globalCompositeOperation = "source-over";
     }
