@@ -40,7 +40,13 @@ l'ambiance de fond, et déclenche un **climax propre au thème** à la libérati
   de l'écran.
 - Monnaie locale : cendres / obsidienne.
 
-### 🌊 Abysses — **⭐ CHOISI COMME MONDE 2 (prochain à construire)**
+### 🌊 Abysses — **✅ CONSTRUIT (Monde 2)**
+Réalisé : décor de base seul au départ (eau, sable, bulles), puis tout s'achète —
+plongeur, herbier, trésor, poissons, bateau, et les profondeurs (−80/−200/−600/−1800 m)
+qui font démarrer la plongée plus bas. Pas de ms/µs (pas futuriste) : à la place un
+**profondimètre** (mètres) et un **manomètre** (bar, pression réelle = 1 + prof/10).
+
+Notes de conception d'origine :
 - Le timer devient l'**air restant** d'un plongeur qui **remonte** vers la
   surface au fil de la journée.
 - Climax : il **crève la surface** = LIBRE.
