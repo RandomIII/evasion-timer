@@ -1132,6 +1132,79 @@
   }
   const mix = (a, b, t) => a.map((v, i) => Math.round(v + (b[i] - v) * t));
 
+  /* ---- caustiques : somme d'ondes calculée pixel par pixel sur une petite surface,
+     puis étirée plein écran. L'agrandissement fait le flou, comme une vraie lumière
+     d'eau. C'est le seul « shader » qu'on peut se permettre en Canvas 2D. ---- */
+  let cauCv = null, cauCtx = null, cauImg = null;
+  const CAU_W = 150, CAU_H = 84;
+  function caustiques(alpha, t){
+    if (alpha < .015) return;
+    if (!cauCv){
+      cauCv = document.createElement("canvas");
+      cauCv.width = CAU_W; cauCv.height = CAU_H;
+      cauCtx = cauCv.getContext("2d");
+      cauImg = cauCtx.createImageData(CAU_W, CAU_H);
+      for (let i = 3; i < cauImg.data.length; i += 4) cauImg.data[i] = 0;
+      for (let i = 0; i < cauImg.data.length; i += 4){
+        cauImg.data[i] = 190; cauImg.data[i + 1] = 242; cauImg.data[i + 2] = 255;
+      }
+    }
+    const d = cauImg.data;
+    for (let y = 0; y < CAU_H; y++){
+      const v = y * .11;
+      for (let x = 0; x < CAU_W; x++){
+        const u = x * .085;
+        const s = Math.sin(u + t) + Math.sin(v * 1.3 - t * .8)
+                + Math.sin((u + v) * .7 + t * 1.35)
+                + Math.sin(Math.sqrt((u - 7) * (u - 7) + (v - 4) * (v - 4)) * 1.15 - t * 1.1);
+        const k = 1 - Math.min(1, Math.abs(s) * .27);
+        d[(y * CAU_W + x) * 4 + 3] = (k * k * k * k * k * k) * 255;   // veines fines
+      }
+    }
+    cauCtx.putImageData(cauImg, 0, 0);
+    ctx.globalCompositeOperation = "lighter";
+    ctx.globalAlpha = alpha;
+    ctx.drawImage(cauCv, 0, 0, W, Hh);
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = "source-over";
+  }
+
+  // motes bioluminescentes : la seule vie visible quand la lumière a disparu
+  const motes = [];
+  let moteSprite = null;
+  function bioluminescence(force, t){
+    if (force < .02) return;
+    if (!motes.length)
+      for (let i = 0; i < 46; i++)
+        motes.push({ x: Math.random() * W, y: Math.random() * Hh,
+                     r: (Math.random() * 2.2 + .8) * dpr,
+                     vy: (Math.random() * .22 + .06) * dpr,
+                     vx: (Math.random() - .5) * .12 * dpr,
+                     ph: Math.random() * 6.3, h: 150 + Math.random() * 60 });
+    // sprite de halo calculé une fois : recréer 46 dégradés par frame coûterait cher sur téléphone
+    if (!moteSprite){
+      moteSprite = document.createElement("canvas");
+      moteSprite.width = moteSprite.height = 64;
+      const g2 = moteSprite.getContext("2d");
+      const gr = g2.createRadialGradient(32, 32, 0, 32, 32, 32);
+      gr.addColorStop(0,   "rgba(215,255,240,.95)");
+      gr.addColorStop(.18, "rgba(140,255,220,.45)");
+      gr.addColorStop(1,   "rgba(90,220,255,0)");
+      g2.fillStyle = gr; g2.fillRect(0, 0, 64, 64);
+    }
+    ctx.globalCompositeOperation = "lighter";
+    for (const m of motes){
+      m.y -= m.vy; m.x += m.vx + Math.sin(m.y * .01 + m.ph) * .12 * dpr;
+      if (m.y < -8){ m.y = Hh + 8; m.x = Math.random() * W; }
+      const pulse = .45 + Math.sin(t * 1.7 + m.ph) * .55;
+      const d2 = m.r * 14;
+      ctx.globalAlpha = force * pulse;
+      ctx.drawImage(moteSprite, m.x - d2 / 2, m.y - d2 / 2, d2, d2);
+    }
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = "source-over";
+  }
+
   /* ---- créatures ----
      Récif et pleine eau utilisent des emoji : jeu d'assets plat et universel, déjà
      employé pour la pause repas, et disponible hors ligne. Les deux créatures
@@ -1272,6 +1345,19 @@
     const surfY = dy - p * SPAN;
     const solY  = dy + (1 - p) * SPAN;
 
+    // couches de brume qui dérivent lentement : donne du volume à l'eau
+    ctx.globalCompositeOperation = "lighter";
+    for (let i = 0; i < 3; i++){
+      const y = ((t0 * (5 + i * 3) + i * Hh / 3) % (Hh + 300 * dpr)) - 150 * dpr;
+      const h = (110 + i * 60) * dpr;
+      const bg = ctx.createLinearGradient(0, y, 0, y + h);
+      bg.addColorStop(0, "rgba(120,190,220,0)");
+      bg.addColorStop(.5, "rgba(120,190,220," + (.018 + clarte * .03) + ")");
+      bg.addColorStop(1, "rgba(120,190,220,0)");
+      ctx.fillStyle = bg; ctx.fillRect(0, y, W, h);
+    }
+    ctx.globalCompositeOperation = "source-over";
+
     // rais de lumière, seulement tant qu'on est assez haut
     if (clarte > .12){
       ctx.globalCompositeOperation = "lighter";
@@ -1289,6 +1375,8 @@
       }
       ctx.globalCompositeOperation = "source-over";
     }
+    // caustiques : franches près de la surface, éteintes en profondeur
+    caustiques(clarte * clarte * .5, t0 * .55);
 
     // plancton : il monte puisqu'on descend
     for (const q of plancton){
@@ -1477,11 +1565,21 @@
       ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, 6.283); ctx.stroke();
     }
 
+    // la bioluminescence prend le relais quand la lumière du jour a disparu
+    bioluminescence((1 - clarte) * .85, t0);
+
     // voile central : sans lui le texte serait illisible en eau claire
     const vg = ctx.createRadialGradient(W * .5, Hh * .42, 0, W * .5, Hh * .42, Math.max(W, Hh) * .55);
     vg.addColorStop(0, "rgba(1,12,22," + (.30 * clarte + .12) + ")");
     vg.addColorStop(1, "rgba(1,12,22,0)");
     ctx.fillStyle = vg; ctx.fillRect(0, 0, W, Hh);
+
+    // vignettage : referme l'image, appuie la sensation d'enfermement en profondeur
+    const vig = ctx.createRadialGradient(W * .5, Hh * .5, Math.min(W, Hh) * .30,
+                                         W * .5, Hh * .5, Math.max(W, Hh) * .78);
+    vig.addColorStop(0, "rgba(0,6,12,0)");
+    vig.addColorStop(1, "rgba(0,6,12," + (.34 + (1 - clarte) * .34) + ")");
+    ctx.fillStyle = vig; ctx.fillRect(0, 0, W, Hh);
 
     // fin de journée : on touche le fond, la lampe éclaire le sable
     if (libre){
