@@ -1444,6 +1444,29 @@
   /* Le sprite est dessiné d'un bloc. Le découpage en tranches ondulantes déchirait
      les dessins fournis — sur un emoji ça passait, sur un vrai poisson c'est laid.
      Seuls calmar et méduse gardent une contraction du corps, qui EST leur nage. */
+  /* Perspective atmosphérique : au lieu de rendre les créatures transparentes —
+     ce qui en fait des fantômes à travers lesquels on voit les caustiques — on les
+     fond vers la couleur de l'eau. Le sujet reste opaque, mais s'efface au loin.
+     Les variantes teintées sont mises en cache, et le cache est vidé quand la
+     couleur de l'eau change assez pour que ça se voie. */
+  const teintes = {};
+  let seauCourant = -1, seauRGB = "10,40,60";
+  const NIV = 6;
+  function spriteFondu(cle, niv, rgb){
+    const k = cle + "|" + niv;
+    if (teintes[k]) return teintes[k];
+    const src = spriteEmoji(cle);
+    if (!src) return null;
+    const c = document.createElement("canvas");
+    c.width = src.width || 128; c.height = src.height || 128;
+    const g = c.getContext("2d");
+    g.drawImage(src, 0, 0, c.width, c.height);
+    g.globalCompositeOperation = "source-atop";   // ne peint que le sujet, pas le vide
+    g.fillStyle = "rgba(" + rgb + "," + (niv / NIV) + ")";
+    g.fillRect(0, 0, c.width, c.height);
+    return teintes[k] = c;
+  }
+
   function poissonEmoji(c, s, t){
     const sp = spriteEmoji(s.em);
     if (!sp) return;                          // sprite pas encore prêt
@@ -1453,7 +1476,9 @@
       const pomp = Math.sin(t * vite + s.ph);
       c.scale(1 + pomp * .10, 1 - pomp * .09);
     }
-    c.drawImage(sp, -d / 2, -d / 2, d, d);
+    // plus la créature est loin, plus elle se confond avec l'eau
+    const niv = Math.min(NIV, Math.round(s.d * NIV * .92 + 1));
+    c.drawImage(spriteFondu(s.em, niv, seauRGB) || sp, -d / 2, -d / 2, d, d);
   }
   function meduse(c, s, t0){                   // ombrelle translucide + tentacules
     const pulse = 1 + Math.sin(t0 * 1.5 + s.ph) * .13, R = s.t * 1.15;
@@ -1800,6 +1825,14 @@
     g.addColorStop(1, "rgb(" + mix([0, 2, 6], [14, 104, 146], clarte) + ")");
     ctx.fillStyle = g; ctx.fillRect(0, 0, W, Hh);
 
+    // teinte de l'eau à mi-hauteur : cible du fondu atmosphérique des créatures
+    const seau = Math.round(clarte * 7);
+    if (seau !== seauCourant){
+      seauCourant = seau;
+      seauRGB = String(mix([1, 6, 13], [56, 160, 190], seau / 7));
+      for (const k in teintes) delete teintes[k];   // les variantes teintées sont périmées
+    }
+
     // géométrie verticale : le plongeur est fixe, surface et fond défilent.
     // SPAN large = la surface quitte l'écran tôt, le fond n'arrive qu'à la fin.
     const dy = Hh * .46, SPAN = Hh * 3;
@@ -2036,8 +2069,8 @@
         s.y += monteeY * dpr * lent;
         if (s.dir > 0 ? s.x > W + 110 * dpr : s.x < -110 * dpr) Object.assign(s, seedNageur(zone));
         ctx.save(); ctx.translate(s.x, s.y);
-        // l'éloignement estompe la créature, et l'eau trouble l'estompe encore
-        ctx.globalAlpha = s.op * (.7 + clarte * .3);
+        // quasi opaque : c'est le fondu vers la couleur de l'eau qui porte la distance
+        ctx.globalAlpha = .82 + s.op * .18;
         if (s.dess){
           ctx.scale(s.dir, 1);
           if (zone === "meduses") meduse(ctx, s, t0);
