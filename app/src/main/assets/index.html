@@ -1107,6 +1107,12 @@
   // enPlace : répartir d'emblée sur la largeur, sinon la zone paraît vide au changement.
   // d = éloignement (0 tout près, 1 au loin) : pilote ensemble opacité, taille et
   // vitesse, ce qui donne une vraie parallaxe plutôt qu'une transparence aléatoire.
+  /* Échelle du décor : tout est proportionnel au plus petit côté du viewport.
+     Sans ça les poissons paraissent minuscules sur un grand écran et énormes
+     dans une petite fenêtre. Recalculée à chaque frame → le redimensionnement
+     est pris en compte immédiatement, sans faire réapparaître les créatures. */
+  const ech = () => Math.min(W, Hh) / 760;
+
   const seedNageur = (zone, enPlace) => {
     const versDroite = Math.random() < .5, d = Math.random();
     const liste = FAUNE[zone] || ["🐟"];
@@ -1115,9 +1121,10 @@
     return { x: enPlace ? Math.random() * W : (versDroite ? -90 * dpr : W + 90 * dpr),
              y: Hh * (.08 + Math.random() * .84),
              dir: versDroite ? 1 : -1, d,
-             v: (Math.random() * .35 + .8) * pr.v * (1 - d * .55) * dpr,
-             // base large : les PNG ont de la marge transparente autour du sujet
-             t: (Math.random() * 3 + 19) * pr.t * (1 - d * .4) * dpr,
+             // tailles et vitesses stockées SANS échelle, appliquée au dessin
+             vb: (Math.random() * .35 + .8) * pr.v * (1 - d * .55),
+             tb: (Math.random() * 3 + 19) * pr.t * (1 - d * .4),
+             v: 0, t: 0,
              op: 1 - d * .5,
              ph: Math.random() * 6.3, zone, em,
              nage: pr.nage,
@@ -2000,7 +2007,10 @@
       while (nageurs.length < cible) nageurs.push(seedNageur(zone, true));
       while (nageurs.length > cible) nageurs.pop();
 
+      const E = ech() * dpr;                 // échelle courante, suit la fenêtre
       for (const s of nageurs){
+        s.t = s.tb * E;                      // taille et allure recalculées chaque frame
+        s.v = s.vb * E;
         // chaque style avance à sa manière : le calmar pousse puis glisse,
         // la méduse dérive en tanguant, le grand nageur file droit.
         // Le tangage est proportionnel à l'allure : sinon un poisson lent oscille
@@ -2054,7 +2064,7 @@
         else {
           const sp = spriteEmoji(baleine.cle);
           if (sp){
-            const L = 300 * dpr;
+            const L = 300 * ech() * dpr;
             ctx.save();
             ctx.translate(baleine.x, baleine.y + Math.sin(t0 * .7 + baleine.ph) * 8 * dpr);
             ctx.scale(-1, 1);                       // les sprites regardent à gauche
