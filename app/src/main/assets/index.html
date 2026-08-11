@@ -1545,6 +1545,139 @@
     b.classList.toggle("visor-casse", avant && secDep <= 60);   // vitre du casque
   }
 
+  /* ---- le plongeur s'équipe à mesure qu'il s'enfonce ----
+     + d'1 h : en maillot, il fait trempette
+     - d'1 h : scaphandre autonome
+     - 10 min : scaphandre pieds-lourds, casque de cuivre et lampe
+     - 1 min  : il a troqué le corps humain contre un sous-marin        */
+  const EQUIPEMENTS = {
+    nageur(c, u, glow){
+      c.strokeStyle = "#E8B98F"; c.lineWidth = 6 * u; c.lineCap = "round";
+      c.beginPath(); c.moveTo(-8 * u, 1 * u); c.lineTo(-30 * u, -3 * u); c.stroke();  // jambes
+      c.fillStyle = "#25A9C6";                                                        // palme
+      c.beginPath(); c.moveTo(-27 * u, -5 * u); c.lineTo(-46 * u, -12 * u);
+      c.lineTo(-44 * u, 3 * u); c.closePath(); c.fill();
+      c.fillStyle = "#E8543F";                                                        // short
+      c.beginPath(); c.ellipse(-7 * u, 0, 11 * u, 8 * u, 0, 0, 6.283); c.fill();
+      c.fillStyle = "#F0C79C";                                                        // torse
+      c.beginPath(); c.ellipse(8 * u, -1 * u, 16 * u, 8 * u, 0, 0, 6.283); c.fill();
+      c.strokeStyle = "#F0C79C"; c.lineWidth = 5 * u;                                 // bras tendu
+      c.beginPath(); c.moveTo(12 * u, 1 * u); c.lineTo(31 * u, 5 * u); c.stroke();
+      c.fillStyle = "#F0C79C";
+      c.beginPath(); c.arc(23 * u, -6 * u, 8 * u, 0, 6.283); c.fill();                // tête
+      c.fillStyle = "#3B2A1E";                                                        // cheveux
+      c.beginPath(); c.arc(22 * u, -7 * u, 8.4 * u, Math.PI, 0); c.fill();
+      c.strokeStyle = "#F5D64A"; c.lineWidth = 2.4 * u;                               // tuba
+      c.beginPath(); c.moveTo(25 * u, -12 * u);
+      c.quadraticCurveTo(19 * u, -24 * u, 26 * u, -26 * u); c.stroke();
+      c.fillStyle = glow;                                                             // masque
+      c.beginPath(); c.ellipse(28 * u, -6 * u, 5 * u, 4 * u, 0, 0, 6.283); c.fill();
+    },
+
+    scuba(c, u, glow){
+      c.fillStyle = "#1B4A6B";                                                        // palmes
+      c.beginPath(); c.moveTo(-30 * u, -7 * u); c.lineTo(-56 * u, -19 * u);
+      c.lineTo(-48 * u, -3 * u); c.closePath(); c.fill();
+      c.beginPath(); c.moveTo(-30 * u, 4 * u); c.lineTo(-54 * u, 13 * u);
+      c.lineTo(-47 * u, 0); c.closePath(); c.fill();
+      c.fillStyle = "#12283C";                                                        // jambes
+      c.beginPath(); c.moveTo(-4 * u, -7 * u); c.lineTo(-31 * u, -7 * u);
+      c.lineTo(-31 * u, 5 * u); c.lineTo(-4 * u, 7 * u); c.closePath(); c.fill();
+      c.fillStyle = "#2E7590";                                                        // bloc, derrière
+      c.beginPath(); c.ellipse(-8 * u, -14 * u, 13 * u, 6.5 * u, -.14, 0, 6.283); c.fill();
+      c.fillStyle = "#17607E";
+      c.beginPath(); c.ellipse(-19 * u, -15 * u, 3.4 * u, 4.2 * u, 0, 0, 6.283); c.fill();
+      c.strokeStyle = "#0E2437"; c.lineWidth = 2.4 * u;                               // détendeur
+      c.beginPath(); c.moveTo(0, -13 * u);
+      c.quadraticCurveTo(16 * u, -20 * u, 24 * u, -8 * u); c.stroke();
+      c.fillStyle = "#12283C";                                                        // buste
+      c.beginPath(); c.ellipse(6 * u, 0, 19 * u, 10.5 * u, 0, 0, 6.283); c.fill();
+      c.fillStyle = "#1E5C82";                                                        // gilet stab
+      c.beginPath(); c.ellipse(3 * u, -1 * u, 12 * u, 8.5 * u, 0, 0, 6.283); c.fill();
+      c.strokeStyle = "#F2B33D"; c.lineWidth = 2 * u;                                 // sangles
+      c.beginPath(); c.moveTo(-2 * u, -9 * u); c.lineTo(-1 * u, 9 * u); c.stroke();
+      c.beginPath(); c.moveTo(9 * u, -8 * u); c.lineTo(10 * u, 9 * u); c.stroke();
+      c.strokeStyle = "#12283C"; c.lineWidth = 5.5 * u; c.lineCap = "round";          // bras tendu
+      c.beginPath(); c.moveTo(13 * u, 5 * u); c.lineTo(31 * u, 8 * u); c.stroke();
+      c.fillStyle = "#0E2437";                                                        // cagoule, détachée du buste
+      c.beginPath(); c.arc(27 * u, -6 * u, 9.5 * u, 0, 6.283); c.fill();
+      c.strokeStyle = "rgba(150,205,230,.45)"; c.lineWidth = 1.4 * u;                 // liseré de lecture
+      c.beginPath(); c.arc(27 * u, -6 * u, 9.5 * u, -2.4, .6); c.stroke();
+      c.fillStyle = "#0A1826";                                                        // jupe du masque
+      c.beginPath(); c.ellipse(32 * u, -7 * u, 8 * u, 6 * u, .12, 0, 6.283); c.fill();
+      c.fillStyle = glow;                                                             // vitre
+      c.beginPath(); c.ellipse(32.5 * u, -7 * u, 6 * u, 4.2 * u, .12, 0, 6.283); c.fill();
+      c.fillStyle = "rgba(255,255,255,.55)";                                          // reflet
+      c.beginPath(); c.ellipse(34 * u, -8.6 * u, 2 * u, 1.2 * u, .3, 0, 6.283); c.fill();
+    },
+
+    scaphandre(c, u, glow){
+      c.strokeStyle = "rgba(140,118,80,.75)"; c.lineWidth = 3.2 * u;                  // narguilé
+      c.beginPath(); c.moveTo(2 * u, -16 * u);
+      c.quadraticCurveTo(-34 * u, -70 * u, -6 * u, -140 * u); c.stroke();
+      c.fillStyle = "#3E3220";                                                        // bottes lestées
+      c.fillRect(-38 * u, -12 * u, 14 * u, 10 * u);
+      c.fillRect(-38 * u, 3 * u, 14 * u, 10 * u);
+      c.fillStyle = "#6E6A52";                                                        // toile
+      c.beginPath(); c.ellipse(-6 * u, 0, 27 * u, 15 * u, 0, 0, 6.283); c.fill();
+      c.strokeStyle = "rgba(0,0,0,.22)"; c.lineWidth = 1.6 * u;                       // plis
+      for (let k = -2; k <= 2; k++){
+        c.beginPath(); c.ellipse(-6 * u + k * 8 * u, 0, 3 * u, 14 * u, 0, 0, 6.283); c.stroke();
+      }
+      c.fillStyle = "#8A6A2E";                                                        // collerette
+      c.beginPath(); c.ellipse(15 * u, -3 * u, 8 * u, 13 * u, 0, 0, 6.283); c.fill();
+      c.fillStyle = "#A87F3C";                                                        // casque cuivre
+      c.beginPath(); c.arc(26 * u, -5 * u, 14.5 * u, 0, 6.283); c.fill();
+      c.fillStyle = "#C89A52";
+      c.beginPath(); c.arc(24 * u, -8 * u, 11 * u, 0, 6.283); c.fill();
+      c.fillStyle = "#7A5A26";                                                        // boulons
+      for (let k = 0; k < 8; k++){
+        const a = k / 8 * 6.283;
+        c.beginPath();
+        c.arc(26 * u + Math.cos(a) * 12.6 * u, -5 * u + Math.sin(a) * 12.6 * u, 1.7 * u, 0, 6.283);
+        c.fill();
+      }
+      c.fillStyle = "#08202E";                                                        // hublot
+      c.beginPath(); c.arc(32 * u, -5 * u, 7.6 * u, 0, 6.283); c.fill();
+      c.fillStyle = glow;
+      c.beginPath(); c.arc(32 * u, -5 * u, 5.8 * u, 0, 6.283); c.fill();
+      c.fillStyle = "#F2E6B8";                                                        // lampe frontale
+      c.beginPath(); c.arc(29 * u, -17 * u, 4.2 * u, 0, 6.283); c.fill();
+    },
+
+    sousmarin(c, u, glow, t){
+      c.strokeStyle = "#7E8E9A"; c.lineWidth = 3 * u;                                 // arbre d'hélice
+      c.beginPath(); c.moveTo(-46 * u, 0); c.lineTo(-56 * u, 0); c.stroke();
+      c.fillStyle = "#9AAAB6";                                                        // hélice qui tourne
+      c.beginPath();
+      c.ellipse(-58 * u, 0, 3 * u, (Math.abs(Math.sin(t * 7)) * 9 + 3) * u, 0, 0, 6.283);
+      c.fill();
+      c.fillStyle = "#33505F";                                                        // gouvernails
+      c.beginPath(); c.moveTo(-38 * u, -5 * u); c.lineTo(-52 * u, -20 * u);
+      c.lineTo(-36 * u, -13 * u); c.closePath(); c.fill();
+      c.beginPath(); c.moveTo(-38 * u, 5 * u); c.lineTo(-52 * u, 20 * u);
+      c.lineTo(-36 * u, 13 * u); c.closePath(); c.fill();
+      c.fillStyle = "#426274";                                                        // coque
+      c.beginPath(); c.ellipse(0, 0, 46 * u, 16 * u, 0, 0, 6.283); c.fill();
+      c.fillStyle = "#5A8091";                                                        // pont éclairé
+      c.beginPath(); c.ellipse(2 * u, -5 * u, 41 * u, 8 * u, 0, 0, 6.283); c.fill();
+      c.fillStyle = "#33505F";                                                        // kiosque
+      c.fillRect(-8 * u, -27 * u, 21 * u, 15 * u);
+      c.beginPath(); c.ellipse(2.5 * u, -27 * u, 10.5 * u, 4 * u, 0, 0, 6.283); c.fill();
+      c.strokeStyle = "#33505F"; c.lineWidth = 2.4 * u;                               // périscope
+      c.beginPath(); c.moveTo(9 * u, -28 * u); c.lineTo(9 * u, -42 * u);
+      c.lineTo(16 * u, -42 * u); c.stroke();
+      for (const hx of [-26, -10, 6, 22]){                                            // hublots
+        c.fillStyle = "#08202E";
+        c.beginPath(); c.arc(hx * u, 1 * u, 5.2 * u, 0, 6.283); c.fill();
+        c.fillStyle = glow;
+        c.beginPath(); c.arc(hx * u, 1 * u, 3.6 * u, 0, 6.283); c.fill();
+      }
+      c.fillStyle = "#F2ECC8";                                                        // projecteur
+      c.beginPath(); c.arc(45 * u, -2 * u, 5.4 * u, 0, 6.283); c.fill();
+    }
+  };
+
   let profM = 0;                            // profondeur courante
   function dessineAbysses(prog, enPause, alerte, libre, secDep){
     initAbysses();
@@ -1832,33 +1965,25 @@
       }
     }
 
-    // ---- le plongeur : il descend, tête en bas ----
+    // ---- le plongeur, dont l'équipement suit la profondeur ----
     if (aDebloque("diver")){
       const dxp = W * .17, tang = Math.sin(t0 * 1.1) * .07;
-      ctx.save(); ctx.translate(dxp, dy); ctx.rotate(.42 + tang);
-      ctx.fillStyle = "rgba(6,16,28,.95)";
-      ctx.beginPath(); ctx.ellipse(0, 0, 25 * dpr, 10 * dpr, 0, 0, 6.283); ctx.fill();   // torse
-      ctx.beginPath(); ctx.arc(23 * dpr, -3 * dpr, 8.5 * dpr, 0, 6.283); ctx.fill();     // tête
-      ctx.fillStyle = "rgba(16,34,52,.95)";
-      ctx.fillRect(-16 * dpr, -17 * dpr, 18 * dpr, 13 * dpr);                            // bloc
-      ctx.fillStyle = "rgba(6,16,28,.95)";
-      ctx.beginPath(); ctx.moveTo(-22 * dpr, -2 * dpr);                                  // jambes
-      ctx.lineTo(-40 * dpr, -7 * dpr); ctx.lineTo(-40 * dpr, 4 * dpr); ctx.closePath(); ctx.fill();
-      ctx.beginPath(); ctx.moveTo(-38 * dpr, -8 * dpr);                                  // palmes
-      ctx.lineTo(-58 * dpr, -16 * dpr); ctx.lineTo(-52 * dpr, -2 * dpr); ctx.closePath(); ctx.fill();
-      ctx.beginPath(); ctx.moveTo(-38 * dpr, 3 * dpr);
-      ctx.lineTo(-56 * dpr, 12 * dpr); ctx.lineTo(-50 * dpr, -1 * dpr); ctx.closePath(); ctx.fill();
-      ctx.fillStyle = "rgba(" + accent().map(Math.round) + ",.95)";                      // masque
-      ctx.beginPath(); ctx.ellipse(27 * dpr, -4 * dpr, 5.5 * dpr, 4 * dpr, 0, 0, 6.283); ctx.fill();
+      const tenue = secDep > 3600 ? "nageur" : secDep > 600 ? "scuba"
+                  : secDep > 60   ? "scaphandre" : "sousmarin";
+      // le sous-marin descend à plat ; un corps humain pique du nez
+      const pique = tenue === "sousmarin" ? .12 : tenue === "scaphandre" ? .18 : .42;
+      ctx.save(); ctx.translate(dxp, dy); ctx.rotate(pique + tang * (tenue === "sousmarin" ? .3 : 1));
+      EQUIPEMENTS[tenue](ctx, dpr, "rgba(" + accent().map(Math.round) + ",.95)", t0);
       ctx.restore();
 
-      // lampe frontale dans le noir
-      if (clarte < .3){
+      // faisceau : seuls le scaphandre et le sous-marin portent une vraie lampe
+      const lampe = tenue === "scaphandre" ? 1 : tenue === "sousmarin" ? 1.5 : 0;
+      if (lampe && clarte < .35){
         ctx.globalCompositeOperation = "lighter";
-        const lg = ctx.createRadialGradient(dxp + 30 * dpr, dy + 10 * dpr, 0,
-                                            dxp + 30 * dpr, dy + 10 * dpr, 230 * dpr);
-        lg.addColorStop(0, "rgba(190,240,255,.20)");
-        lg.addColorStop(1, "rgba(190,240,255,0)");
+        const lx = dxp + 34 * dpr, ly = dy + 4 * dpr, R = 260 * dpr * lampe;
+        const lg = ctx.createRadialGradient(lx, ly, 0, lx, ly, R);
+        lg.addColorStop(0, "rgba(200,242,255," + (.18 * lampe) + ")");
+        lg.addColorStop(1, "rgba(200,242,255,0)");
         ctx.fillStyle = lg; ctx.fillRect(0, 0, W, Hh);
         ctx.globalCompositeOperation = "source-over";
       }
