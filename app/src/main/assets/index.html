@@ -1081,12 +1081,24 @@
   ];
   const profMax = () => (PROFONDEURS.find(z => aDebloque(z.id)) || { m:30 }).m;
 
-  // zone biologique selon la profondeur : détermine QUI on croise
-  function zoneDe(m){
-    if (m < 45)  return "recif";      // eaux claires, poissons vifs
-    if (m < 250) return "large";      // pleine eau, poissons argentés
-    if (m < 900) return "meduses";    // pénombre, méduses
-    return "abysse";                  // nuit totale, poissons-lanternes
+  /* Zone et clarté sont pilotées par le TEMPS RESTANT, aux mêmes seuils que la LED
+     du manomètre : l'instrument et l'environnement racontent la même chose.
+     (La profondeur en mètres et la pression restent, elles, continues et physiques.) */
+  const zoneDe = s => s > 3600 ? "recif"      // + d'1 h : eaux claires, poissons vifs
+                    : s > 1200 ? "large"      // 1 h    : pleine eau, poissons argentés
+                    : s >  300 ? "meduses"    // 20 min : pénombre, méduses
+                    : s >   60 ? "abysse"     // 5 min  : nuit, poissons-lanternes
+                    :            "fosse";     // 1 min  : la fosse, presque rien
+  // clarté par paliers interpolés, calée sur les mêmes bornes
+  const ANCRES = [[14400, 1], [3600, .55], [1200, .28], [300, .12], [60, .05], [0, .02]];
+  function clarteDe(s){
+    s = Math.max(0, s);
+    if (s >= ANCRES[0][0]) return 1;
+    for (let i = 0; i < ANCRES.length - 1; i++){
+      const [a, va] = ANCRES[i], [b, vb] = ANCRES[i + 1];
+      if (s <= a && s >= b) return vb + (va - vb) * (s - b) / (a - b);
+    }
+    return .02;
   }
 
   const plancton = [], nageurs = [], bulles = [], herbes = [];
@@ -1240,17 +1252,15 @@
   }
 
   let profM = 0;                            // profondeur courante
-  function dessineAbysses(prog, enPause, alerte, libre){
+  function dessineAbysses(prog, enPause, alerte, libre, secDep){
     initAbysses();
     const p = Math.max(0, Math.min(1, prog));
     const lent = reduce ? .35 : 1;
     const PM = profMax();
     profM = PM * p;                          // on DESCEND : 0 le matin, PM le soir
     const t0 = performance.now() / 1000;
-    const zone = zoneDe(profM);
-
-    // l'eau s'assombrit avec la profondeur
-    const clarte = Math.max(.04, 1 / (1 + profM / 55));
+    const zone = libre ? "fosse" : zoneDe(secDep);
+    const clarte = libre ? .05 : clarteDe(secDep);
     const g = ctx.createLinearGradient(0, 0, 0, Hh);
     g.addColorStop(0, "rgb(" + mix([1, 8, 18], [96, 214, 232], clarte) + ")");
     g.addColorStop(1, "rgb(" + mix([0, 2, 6], [14, 104, 146], clarte) + ")");
@@ -1362,9 +1372,13 @@
 
     // ---- faune de la zone courante uniquement ----
     if (aDebloque("bg")){
-      const zoneOk = { recif:true, large:true,
-                       meduses:aDebloque("rouge"), abysse:aDebloque("rouge") }[zone];
-      const cible = zoneOk ? (aDebloque("orange") ? 9 : 5) : 0;
+      const zoneOk = { recif:true, large:true, meduses:aDebloque("rouge"),
+                       abysse:aDebloque("rouge"), fosse:aDebloque("rouge") }[zone];
+      // les méduses sont grandes : moins nombreuses. Dans la fosse, la vie se raréfie.
+      const cible = !zoneOk ? 0
+                  : zone === "fosse"   ? 3
+                  : zone === "meduses" ? 5
+                  : (aDebloque("orange") ? 9 : 5);
       // renouveler la population quand on change de zone
       for (let i = nageurs.length - 1; i >= 0; i--)
         if (nageurs[i].zone !== zone) nageurs.splice(i, 1);
@@ -1379,7 +1393,7 @@
         if (zone === "recif")        poissonRecif(ctx, s, clarte);
         else if (zone === "large")   poissonLarge(ctx, s, clarte);
         else if (zone === "meduses") meduse(ctx, s, t0);
-        else                         poissonLanterne(ctx, s, t0);
+        else                         poissonLanterne(ctx, s, t0);   // abysse et fosse
         ctx.restore();
       }
     }
@@ -1633,7 +1647,7 @@
     const [r, g2, bl] = accent();
 
     if (save.actif === "abysses"){       // ===== MONDE 2 : remontée des abysses =====
-      dessineAbysses(prog, enPause, alerte, phase === "libre");
+      dessineAbysses(prog, enPause, alerte, phase === "libre", secDep);
       for (let i = bursts.length - 1; i >= 0; i--){
         const p = bursts[i];
         p.x += p.vx; p.y += p.vy; p.vy += .18 * dpr; p.life -= .012;
