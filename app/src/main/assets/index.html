@@ -1222,10 +1222,33 @@
   };
   // proportion de créatures dessinées plutôt qu'en emoji, par zone
   const PART_DESSIN = { recif: 0, large: 0, meduses: .55, abysse: .7, fosse: .8 };
-  function poissonEmoji(c, s){
-    c.font = (s.t * 3.2) + 'px "Segoe UI Emoji","Apple Color Emoji","Noto Color Emoji",sans-serif';
-    c.textAlign = "center"; c.textBaseline = "middle";
-    c.fillText(s.em, 0, 0);
+  /* Ondulation : l'emoji est rendu une fois hors écran, puis redessiné en tranches
+     verticales décalées par une onde qui court de la tête vers la queue. Un simple
+     balancement d'ensemble ferait « panneau qui pivote » ; là, le corps nage. */
+  const emSprites = {};
+  const TAILLE_SPRITE = 96;
+  function spriteEmoji(em){
+    if (emSprites[em]) return emSprites[em];
+    const c = document.createElement("canvas");
+    c.width = c.height = TAILLE_SPRITE;
+    const g = c.getContext("2d");
+    g.font = Math.round(TAILLE_SPRITE * .82)
+           + 'px "Segoe UI Emoji","Apple Color Emoji","Noto Color Emoji",sans-serif';
+    g.textAlign = "center"; g.textBaseline = "middle";
+    g.fillText(em, TAILLE_SPRITE / 2, TAILLE_SPRITE / 2);
+    return emSprites[em] = c;
+  }
+  const N_TRANCHES = 11;
+  function poissonEmoji(c, s, t){
+    const sp = spriteEmoji(s.em), d = s.t * 3.2;
+    const sw = sp.width / N_TRANCHES, dw = d / N_TRANCHES;
+    for (let i = 0; i < N_TRANCHES; i++){
+      const u = i / (N_TRANCHES - 1);            // 0 = tête, 1 = queue
+      // l'onde remonte le corps ; l'amplitude enfle vers la queue
+      const dy = Math.sin(t * 3.4 + s.ph - u * 3.2) * d * .055 * (.15 + u);
+      c.drawImage(sp, i * sw, 0, sw, sp.height,
+                  -d / 2 + i * dw, -d / 2 + dy, dw + .7, d);   // +.7 : pas de couture
+    }
   }
   function meduse(c, s, t0){                   // ombrelle translucide + tentacules
     const pulse = 1 + Math.sin(t0 * 1.5 + s.ph) * .13, R = s.t * 1.15;
@@ -1486,7 +1509,7 @@
           else                    poissonLanterne(ctx, s, t0);   // abysse et fosse
         } else {
           ctx.scale(-s.dir, 1);            // les emoji poissons regardent à gauche
-          poissonEmoji(ctx, s);
+          poissonEmoji(ctx, s, t0);
         }
         ctx.globalAlpha = 1;
         ctx.restore();
