@@ -348,9 +348,9 @@
   body.lock-pin .need-pin{display:none;}
   body.lock-son .need-son{display:none;}
   body.lock-full .need-full{display:none;}
-  /* dans les abysses, profondeur et pression remplacent la cellule technique ;
-     la frise est inutile puisque la descente elle-même montre l'avancement */
-  body.monde-abysses .cell-fps,body.monde-abysses .day{display:none;}
+  /* RP : dans un masque de plongée il n'y a pas de tableau de bord.
+     Les instruments (règle de profondeur, manomètre) remplacent la télémétrie. */
+  body.monde-abysses .telemetry,body.monde-abysses .day{display:none;}
 
   /* ---------- compteur de tokens ---------- */
   .tokBtn{
