@@ -1450,9 +1450,9 @@
      Les variantes teintées sont mises en cache, et le cache est vidé quand la
      couleur de l'eau change assez pour que ça se voie. */
   const teintes = {};
-  let seauCourant = -1, seauRGB = "10,40,60";
-  const NIV = 6;
-  function spriteFondu(cle, niv, rgb){
+  let seauCourant = -1, seauArr = [10, 40, 60];
+  const NIV = 7;
+  function spriteFondu(cle, niv){
     const k = cle + "|" + niv;
     if (teintes[k]) return teintes[k];
     const src = spriteEmoji(cle);
@@ -1461,8 +1461,12 @@
     c.width = src.width || 128; c.height = src.height || 128;
     const g = c.getContext("2d");
     g.drawImage(src, 0, 0, c.width, c.height);
+    const f = niv / NIV;                          // 0 tout près, 1 au loin
+    // la cible du fondu s'assombrit avec la distance : au loin on ne voit plus
+    // qu'une forme sombre dans l'eau, pas un poisson bleu clair
+    const [r, v, b] = seauArr.map(x => Math.round(x * (1 - f * .62)));
     g.globalCompositeOperation = "source-atop";   // ne peint que le sujet, pas le vide
-    g.fillStyle = "rgba(" + rgb + "," + (niv / NIV) + ")";
+    g.fillStyle = "rgba(" + r + "," + v + "," + b + "," + (.34 + f * .58) + ")";
     g.fillRect(0, 0, c.width, c.height);
     return teintes[k] = c;
   }
@@ -1476,9 +1480,9 @@
       const pomp = Math.sin(t * vite + s.ph);
       c.scale(1 + pomp * .10, 1 - pomp * .09);
     }
-    // plus la créature est loin, plus elle se confond avec l'eau
-    const niv = Math.min(NIV, Math.round(s.d * NIV * .92 + 1));
-    c.drawImage(spriteFondu(s.em, niv, seauRGB) || sp, -d / 2, -d / 2, d, d);
+    // même au premier plan la créature baigne dans l'eau : le fondu ne part pas de zéro
+    const niv = Math.max(1, Math.min(NIV, Math.round(s.d * (NIV - 1)) + 1));
+    c.drawImage(spriteFondu(s.em, niv) || sp, -d / 2, -d / 2, d, d);
   }
   function meduse(c, s, t0){                   // ombrelle translucide + tentacules
     const pulse = 1 + Math.sin(t0 * 1.5 + s.ph) * .13, R = s.t * 1.15;
@@ -1829,7 +1833,7 @@
     const seau = Math.round(clarte * 7);
     if (seau !== seauCourant){
       seauCourant = seau;
-      seauRGB = String(mix([1, 6, 13], [56, 160, 190], seau / 7));
+      seauArr = mix([1, 6, 13], [40, 124, 154], seau / 7);
       for (const k in teintes) delete teintes[k];   // les variantes teintées sont périmées
     }
 
