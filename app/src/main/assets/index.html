@@ -56,7 +56,7 @@
       #FF0000 0px,#FF8000 40px,#FFE000 80px,#00FF00 120px,#00FFFF 160px,
       #3300FF 200px,#B400FF 240px,#FF0080 280px,#FF0000 320px);
   }
-  body.arc .rgbVeil{opacity:.14;animation:rgbSlide .5s linear infinite;}
+  body.monde-neon.arc .rgbVeil{opacity:.14;animation:rgbSlide .5s linear infinite;}
   @keyframes rgbSlide{from{background-position:0 0}to{background-position:320px 0}}
 
   .stage{
@@ -219,23 +219,24 @@
   body.jaune{--glow:#FFE34A;--magenta:#FFC24A;}
   body.orange{--glow:#FF9A1F;--magenta:#FFB86A;}
   body.rouge{--glow:#FF3B2F;--magenta:#FF8A6A;}
-  body.rouge .stage{animation:shake .09s infinite;}
+  body.monde-neon.rouge .stage{animation:shake .09s infinite;}
   body.violet{--glow:#B14DFF;--magenta:#F06BFF;}
-  body.violet .stage{animation:shakeFast .05s infinite;}
+  body.monde-neon.violet .stage{animation:shakeFast .05s infinite;}
 
   /* --glow enregistrée comme couleur : sans ça, une custom property s'anime par à-coups
      au lieu de s'interpoler entre les 8 teintes. */
   @property --glow{ syntax:"<color>"; inherits:true; initial-value:#00E5FF; }
 
-  body.arc{--glow:#FF0000;--magenta:#FF0000;}
-  body.arc .stage{animation:shakeWild .07s infinite;}
+  body.monde-neon.arc{--glow:#FF0000;--magenta:#FF0000;}
+  body.monde-neon.arc .stage{animation:shakeWild .07s infinite;}
   /* vague RGB façon clavier gamer : même cycle, décalé bloc par bloc de gauche à droite */
-  body.arc .eyebrow, body.arc .sub, body.arc .day, body.arc .telemetry,
-  body.arc .readout .d7, body.arc .readout .colon{
+  body.monde-neon.arc .eyebrow, body.monde-neon.arc .sub, body.monde-neon.arc .day,
+  body.monde-neon.arc .telemetry,
+  body.monde-neon.arc .readout .d7, body.monde-neon.arc .readout .colon{
     animation:arcCycle 1.15s linear infinite;
     animation-delay:calc(var(--w,0) * -.05s);
   }
-  body.arc .us{color:var(--glow);opacity:1;filter:none;}   /* les µs suivent la vague aussi */
+  body.monde-neon.arc .us{color:var(--glow);opacity:1;filter:none;}   /* les µs suivent la vague aussi */
   body.arc .eyebrow{--w:0}  body.arc .sub{--w:6}  body.arc .day{--w:9}
   body.arc .telemetry{--w:11}
   /* palette saturée à fond, ordre exact : rouge→orange→jaune→vert→cyan→indigo→violet→rose */
@@ -491,6 +492,8 @@
   body.monde-abysses.orange{--glow:#3F72DC;--magenta:#8FAEF2;}
   body.monde-abysses.rouge {--glow:#6B54E4;--magenta:#A99AF5;}
   body.monde-abysses.violet{--glow:#3BF0A8;--magenta:#9BFAD6;}
+  /* dernières secondes dans la fosse : bioluminescence crue, sans arc-en-ciel ni secousse */
+  body.monde-abysses.arc{--glow:#8FFFE4;--magenta:#C8FFF2;}
   body.monde-abysses .libre{color:#EAFBFF;text-shadow:0 0 60px #7FE9F5;}
   /* l'eau claire délave le texte : on le rehausse */
   body.monde-abysses .eyebrow{color:#BFE8F5;text-shadow:0 2px 10px rgba(0,20,34,.9);}
@@ -566,9 +569,9 @@
   }
 
   @media (prefers-reduced-motion: reduce){
-    body.rouge .stage,body.violet .stage,body.arc .stage{animation:none}
+    body.monde-neon.rouge .stage,body.monde-neon.violet .stage,body.monde-neon.arc .stage{animation:none}
     .dot,.colon,.burger i{animation:none}
-    body.arc .rgbVeil{animation:none}       /* voile figé plutôt que défilant */
+    body.monde-neon.arc .rgbVeil{animation:none}       /* voile figé plutôt que défilant */
   }
 </style>
 
@@ -803,7 +806,7 @@
 
         { id:"rouge",  nom:"−600 m · méduses",     cout:220, pre:"orange", row:8, col:2 },
         { id:"violet", nom:"−1800 m · la baleine", cout:400, pre:"rouge",  row:9, col:2 },
-        { id:"arc",    nom:"SURFACE · 10 s",       cout:800, pre:"violet", row:10, col:2 }
+        { id:"arc",    nom:"LA FOSSE · 10 s",      cout:800, pre:"violet", row:10, col:2 }
       ]
     }
   };
