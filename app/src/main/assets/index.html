@@ -1116,7 +1116,8 @@
              t: (Math.random() * 8 + 9) * (1 - d * .45) * dpr,
              op: 1 - d * .5,
              ph: Math.random() * 6.3, zone,
-             em: (FAUNE[zone] || [])[(Math.random() * 3) | 0] || "🐟" };
+             dess: Math.random() < (PART_DESSIN[zone] || 0),
+             em: (FAUNE[zone] || ["🐟"])[(Math.random() * (FAUNE[zone] || ["🐟"]).length) | 0] };
   };
   function initAbysses(){
     if (abyssPret) return;
@@ -1136,7 +1137,18 @@
      employé pour la pause repas, et disponible hors ligne. Les deux créatures
      signature restent dessinées : aucun emoji de poisson-lanterne n'existe, et
      celui de méduse est trop récent pour s'afficher partout. */
-  const FAUNE = { recif: ["🐠", "🐟", "🐡"], large: ["🐟", "🐬", "🦈"] };
+  // Faune par zone. Les créatures dessinées (méduse, poisson-lanterne) restent
+  // mélangées aux emoji dans les zones profondes : elles portent l'identité du lieu
+  // et s'affichent partout, même là où 🪼 manquerait.
+  const FAUNE = {
+    recif:   ["🐠", "🐟", "🐡", "🐢", "🦐", "🐙", "🦀"],
+    large:   ["🐟", "🐬", "🦈", "🐋", "🦑", "🐠"],
+    meduses: ["🪼", "🦑", "🐙"],
+    abysse:  ["🦑", "🪼"],
+    fosse:   ["🦑"]
+  };
+  // proportion de créatures dessinées plutôt qu'en emoji, par zone
+  const PART_DESSIN = { recif: 0, large: 0, meduses: .55, abysse: .7, fosse: .8 };
   function poissonEmoji(c, s){
     c.font = (s.t * 3.2) + 'px "Segoe UI Emoji","Apple Color Emoji","Noto Color Emoji",sans-serif';
     c.textAlign = "center"; c.textBaseline = "middle";
@@ -1380,13 +1392,13 @@
         ctx.save(); ctx.translate(s.x, s.y);
         // l'éloignement estompe la créature, et l'eau trouble l'estompe encore
         ctx.globalAlpha = s.op * (.7 + clarte * .3);
-        if (zone === "recif" || zone === "large"){
-          ctx.scale(-s.dir, 1);            // les emoji poissons regardent à gauche
-          poissonEmoji(ctx, s);
-        } else {
+        if (s.dess){
           ctx.scale(s.dir, 1);
           if (zone === "meduses") meduse(ctx, s, t0);
           else                    poissonLanterne(ctx, s, t0);   // abysse et fosse
+        } else {
+          ctx.scale(-s.dir, 1);            // les emoji poissons regardent à gauche
+          poissonEmoji(ctx, s);
         }
         ctx.globalAlpha = 1;
         ctx.restore();
