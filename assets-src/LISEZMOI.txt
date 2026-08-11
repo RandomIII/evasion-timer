@@ -20,7 +20,7 @@ large/      (1 h — pleine eau)
   mahimahi.png
   trevally.png
   hammerhead.png
-  ray.png
+  bluemarlin.png
 
 penombre/   (20 min — crepusculaire)
   jellyfish.png
