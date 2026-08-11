@@ -1214,7 +1214,7 @@
   // mélangées aux emoji dans les zones profondes : elles portent l'identité du lieu
   // et s'affichent partout, même là où 🪼 manquerait.
   const FAUNE = {
-    recif:   ["🐠", "🐟", "🐡", "🐢", "🦐", "🐙", "🦀"],
+    recif:   ["clownfish", "butterflyfish", "surgeonfish", "turkeyfish", "pufferfish"],
     large:   ["🐟", "🐬", "🦈", "🐋", "🦑", "🐠"],
     meduses: ["🪼", "🦑", "🐙"],
     abysse:  ["🦑", "🪼"],
@@ -1222,21 +1222,125 @@
   };
   // proportion de créatures dessinées plutôt qu'en emoji, par zone
   const PART_DESSIN = { recif: 0, large: 0, meduses: .55, abysse: .7, fosse: .8 };
+  /* ---- espèces dessinées : silhouette juste, aplats simples, œil discret.
+     Chacune est peinte une fois dans un carré de 96 px, tête à gauche. ---- */
+  const S96 = 96;
+  const DESSINS = {
+    clownfish(g){                                   // orange, 3 bandes blanches bordées de noir
+      g.fillStyle = "#0E0A08";                                    // liseré des nageoires
+      g.beginPath(); g.ellipse(50, 48, 36, 23, 0, 0, 6.283); g.fill();
+      g.beginPath(); g.moveTo(80, 48); g.lineTo(95, 30); g.lineTo(95, 66); g.closePath(); g.fill();
+      g.fillStyle = "#F0641E";
+      g.beginPath(); g.moveTo(80, 48); g.lineTo(92, 34); g.lineTo(92, 62); g.closePath(); g.fill();
+      g.save();                                                   // bandes contenues dans le corps
+      g.beginPath(); g.ellipse(50, 48, 33, 20, 0, 0, 6.283); g.clip();
+      g.fillStyle = "#F0641E"; g.fillRect(0, 0, S96, S96);
+      for (const [x, w] of [[28, 6], [50, 7], [70, 5]]){
+        g.fillStyle = "#120C08";
+        g.beginPath(); g.ellipse(x, 48, w + 1.6, 24, 0, 0, 6.283); g.fill();
+        g.fillStyle = "#F7F3EC";
+        g.beginPath(); g.ellipse(x, 48, w, 24, 0, 0, 6.283); g.fill();
+      }
+      g.restore();
+      g.fillStyle = "#1A0E08";
+      g.beginPath(); g.arc(24, 43, 3.4, 0, 6.283); g.fill();      // œil
+    },
+    butterflyfish(g){                               // disque jaune, bandeau noir sur l'œil
+      g.fillStyle = "#F6C42A";
+      g.beginPath(); g.ellipse(50, 48, 29, 30, 0, 0, 6.283); g.fill();
+      g.beginPath(); g.moveTo(78, 48); g.lineTo(94, 34); g.lineTo(94, 62); g.closePath(); g.fill();
+      g.fillStyle = "#FBF4DE";                                    // avant plus clair
+      g.beginPath(); g.ellipse(34, 48, 15, 26, 0, 0, 6.283); g.fill();
+      g.fillStyle = "#F6C42A";
+      g.beginPath(); g.moveTo(50, 20); g.lineTo(70, 24); g.lineTo(52, 30); g.closePath(); g.fill();
+      g.fillStyle = "#17110A";                                    // bandeau vertical fin
+      g.save();
+      g.beginPath(); g.ellipse(50, 48, 29, 30, 0, 0, 6.283); g.clip();
+      g.beginPath(); g.ellipse(30, 48, 3.8, 32, 0, 0, 6.283); g.fill();
+      g.restore();
+      g.beginPath(); g.moveTo(22, 45); g.lineTo(10, 48); g.lineTo(22, 52); g.closePath(); g.fill();
+      g.fillStyle = "#17110A";
+      g.beginPath(); g.arc(31, 42, 3, 0, 6.283); g.fill();        // œil dans le bandeau
+    },
+    surgeonfish(g){                                 // ovale bleu profond, queue jaune
+      g.fillStyle = "#F2C13C";
+      g.beginPath(); g.moveTo(74, 48); g.lineTo(94, 30); g.lineTo(94, 66); g.closePath(); g.fill();
+      g.fillStyle = "#1B54C8";
+      g.beginPath(); g.ellipse(46, 48, 32, 21, 0, 0, 6.283); g.fill();
+      g.fillStyle = "#0C1E4E";                                    // marque en palette
+      g.beginPath(); g.moveTo(46, 32); g.quadraticCurveTo(70, 40, 72, 48);
+      g.quadraticCurveTo(70, 56, 46, 64); g.quadraticCurveTo(60, 48, 46, 32); g.fill();
+      g.fillStyle = "#1B54C8";
+      g.beginPath(); g.moveTo(40, 28); g.lineTo(58, 30); g.lineTo(44, 36); g.closePath(); g.fill();
+      g.fillStyle = "#08132E";
+      g.beginPath(); g.arc(24, 44, 3.2, 0, 6.283); g.fill();
+    },
+    turkeyfish(g){                                  // rascasse : longues épines en éventail
+      g.strokeStyle = "rgba(240,228,214,.85)"; g.lineWidth = 2.2; g.lineCap = "round";
+      for (let i = 0; i < 7; i++){                                // épines dorsales
+        const x = 34 + i * 6;
+        g.beginPath(); g.moveTo(x, 40);
+        g.quadraticCurveTo(x + 8, 18, x + 16, 6 + i * 2); g.stroke();
+      }
+      for (let i = 0; i < 5; i++){                                // épines ventrales
+        const x = 36 + i * 7;
+        g.beginPath(); g.moveTo(x, 58);
+        g.quadraticCurveTo(x + 8, 76, x + 14, 90 - i * 3); g.stroke();
+      }
+      g.fillStyle = "#8E2418";
+      g.beginPath(); g.ellipse(44, 48, 28, 15, 0, 0, 6.283); g.fill();
+      g.beginPath(); g.moveTo(70, 48); g.lineTo(92, 36); g.lineTo(92, 60); g.closePath(); g.fill();
+      g.fillStyle = "#F3E4D4";                                    // rayures verticales
+      for (let i = 0; i < 5; i++){
+        g.beginPath(); g.ellipse(26 + i * 11, 48, 3, 15, 0, 0, 6.283); g.fill();
+      }
+      g.fillStyle = "#1A0B06";
+      g.beginPath(); g.arc(22, 44, 3.2, 0, 6.283); g.fill();
+    },
+    pufferfish(g){                                  // sphère épineuse, gros œil
+      g.strokeStyle = "#8A6A2E"; g.lineWidth = 2.4; g.lineCap = "round";
+      for (let i = 0; i < 16; i++){                               // piquants
+        const a = i / 16 * 6.283, r = 28;
+        g.beginPath();
+        g.moveTo(46 + Math.cos(a) * r, 48 + Math.sin(a) * r);
+        g.lineTo(46 + Math.cos(a) * (r + 8), 48 + Math.sin(a) * (r + 8));
+        g.stroke();
+      }
+      g.fillStyle = "#D9AE5E";
+      g.beginPath(); g.arc(46, 48, 28, 0, 6.283); g.fill();
+      g.fillStyle = "#EFDCAE";                                    // ventre clair
+      g.beginPath(); g.ellipse(40, 58, 18, 12, 0, 0, 6.283); g.fill();
+      g.fillStyle = "#8A6A2E";                                    // taches
+      for (const [x, y] of [[52, 34], [62, 44], [50, 50], [38, 36]]){
+        g.beginPath(); g.arc(x, y, 3, 0, 6.283); g.fill();
+      }
+      g.fillStyle = "#F7EEDC";
+      g.beginPath(); g.arc(28, 42, 6.5, 0, 6.283); g.fill();      // gros œil
+      g.fillStyle = "#170F06";
+      g.beginPath(); g.arc(26, 42, 3.4, 0, 6.283); g.fill();
+    }
+  };
+
   /* Ondulation : l'emoji est rendu une fois hors écran, puis redessiné en tranches
      verticales décalées par une onde qui court de la tête vers la queue. Un simple
      balancement d'ensemble ferait « panneau qui pivote » ; là, le corps nage. */
+  // Un seul cache pour tout le monde : une espèce dessinée et un emoji produisent
+  // le même sprite, donc les deux héritent de l'ondulation sans code en double.
   const emSprites = {};
-  const TAILLE_SPRITE = 96;
-  function spriteEmoji(em){
-    if (emSprites[em]) return emSprites[em];
+  const TAILLE_SPRITE = S96;
+  function spriteEmoji(cle){
+    if (emSprites[cle]) return emSprites[cle];
     const c = document.createElement("canvas");
     c.width = c.height = TAILLE_SPRITE;
     const g = c.getContext("2d");
-    g.font = Math.round(TAILLE_SPRITE * .82)
-           + 'px "Segoe UI Emoji","Apple Color Emoji","Noto Color Emoji",sans-serif';
-    g.textAlign = "center"; g.textBaseline = "middle";
-    g.fillText(em, TAILLE_SPRITE / 2, TAILLE_SPRITE / 2);
-    return emSprites[em] = c;
+    if (DESSINS[cle]) DESSINS[cle](g);
+    else {
+      g.font = Math.round(TAILLE_SPRITE * .82)
+             + 'px "Segoe UI Emoji","Apple Color Emoji","Noto Color Emoji",sans-serif';
+      g.textAlign = "center"; g.textBaseline = "middle";
+      g.fillText(cle, TAILLE_SPRITE / 2, TAILLE_SPRITE / 2);
+    }
+    return emSprites[cle] = c;
   }
   const N_TRANCHES = 11;
   function poissonEmoji(c, s, t){

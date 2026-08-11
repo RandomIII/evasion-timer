@@ -1,0 +1,49 @@
+ASSETS POISSONS — monde des abysses
+===================================
+
+Depose les PNG dans le dossier de leur zone, avec EXACTEMENT ces noms.
+
+PREREQUIS
+  - PNG avec fond TRANSPARENT (canal alpha)
+  - orientes vers la GAUCHE (le miroir est gere par le code)
+  - 256 px max sur le grand cote, fichiers legers
+
+recif/      (plus d'1 h restante — eaux claires)
+  clownfish.png
+  butterflyfish.png
+  surgeonfish.png
+  turkeyfish.png
+  pufferfish.png
+
+large/      (1 h — pleine eau)
+  tuna.png
+  mahimahi.png
+  trevally.png
+  hammerhead.png
+  ray.png
+
+penombre/   (20 min — crepusculaire)
+  jellyfish.png
+  squid.png
+  octopus.png
+  seabutterfly.png
+  morayeel.png
+
+abysse/     (5 min et derniere minute — nuit)
+  footballfish.png
+  barreleye.png
+  coelacanth.png
+  oarfish.png
+
+rares/      (optionnel : gros, passage rare et solitaire)
+  whaleshark.png
+  sunfish.png
+
+BIOLUMINESCENCE
+  Ajoute -glow avant l'extension pour qu'il soit dessine en fusion additive
+  (il brillera vraiment dans le noir) :
+      footballfish-glow.png
+      barreleye-glow.png
+      jellyfish-glow.png
+
+Les zones sans fichier gardent les emoji actuels : tu peux completer au fil du temps.
