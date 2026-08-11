@@ -1101,7 +1101,7 @@
     return .02;
   }
 
-  const plancton = [], nageurs = [], bulles = [], herbes = [];
+  const plancton = [], nageurs = [], bulles = [], herbes = [], rochers = [], grains = [];
   let baleine = null, abyssPret = false;
 
   // enPlace : répartir d'emblée sur la largeur, sinon la zone paraît vide au changement.
@@ -1131,8 +1131,14 @@
                       r: (Math.random() * 1.3 + .35) * dpr,
                       v: (Math.random() * .4 + .12) * dpr, a: Math.random() * .4 + .12 });
     for (let i = 0; i < 24; i++)
-      herbes.push({ x: Math.random() * W, h: (Math.random() * 70 + 40) * dpr,
+      herbes.push({ x: Math.random(), h: (Math.random() * 70 + 40) * dpr,
                     ph: Math.random() * 6.3, w: (Math.random() * 3 + 2.5) * dpr });
+    // décor du fond, en fractions de largeur pour survivre à un redimensionnement
+    for (let i = 0; i < 9; i++)
+      rochers.push({ x: Math.random(), w: (Math.random() * 55 + 30) * dpr,
+                     h: (Math.random() * 45 + 22) * dpr });
+    for (let i = 0; i < 130; i++)
+      grains.push({ x: Math.random(), y: Math.random(), r: Math.random() * 1.6 + .5 });
   }
   const mix = (a, b, t) => a.map((v, i) => Math.round(v + (b[i] - v) * t));
 
@@ -1573,7 +1579,12 @@
     // SPAN large = la surface quitte l'écran tôt, le fond n'arrive qu'à la fin.
     const dy = Hh * .46, SPAN = Hh * 3;
     const surfY = dy - p * SPAN;
-    const solY  = dy + (1 - p) * SPAN;
+    // Le fond ne monte dans le champ que sur les 2 dernières minutes : il doit
+    // surgir de l'obscurité au moment où la vitre lâche, pas traîner tout l'après-midi.
+    const APPROCHE = 120;
+    const solY = libre ? dy
+               : secDep > APPROCHE ? Hh * 99
+               : dy + (secDep / APPROCHE) * Hh * 1.5;
 
     // couches de brume qui dérivent lentement : donne du volume à l'eau
     ctx.globalCompositeOperation = "lighter";
@@ -1643,29 +1654,61 @@
       }
     }
 
-    // ---- le fond, qui n'apparaît qu'en fin de journée ----
+    // ---- la plaine abyssale, qui surgit dans les dernières secondes ----
     if (solY < Hh + 60 * dpr){
-      ctx.fillStyle = "rgb(" + mix([14, 18, 26], [226, 206, 156], clarte) + ")";
-      ctx.beginPath(); ctx.moveTo(0, Hh); ctx.lineTo(0, solY + 14 * dpr);
-      for (let x = 0; x <= W; x += 24 * dpr)
-        ctx.lineTo(x, solY + Math.sin(x * .011) * 11 * dpr);
-      ctx.lineTo(W, Hh); ctx.closePath(); ctx.fill();
+      const relief = x => Math.sin(x * .011) * 11 * dpr + Math.sin(x * .0037 + 2) * 18 * dpr;
+
+      // voile de sédiment en suspension juste au-dessus du sol
+      const hz = ctx.createLinearGradient(0, solY - 120 * dpr, 0, solY + 20 * dpr);
+      hz.addColorStop(0, "rgba(90,120,140,0)");
+      hz.addColorStop(1, "rgba(90,120,140,.16)");
+      ctx.fillStyle = hz; ctx.fillRect(0, solY - 120 * dpr, W, 140 * dpr);
+
+      // rochers en silhouette, posés derrière le sol
+      ctx.fillStyle = "rgb(" + mix([9, 13, 20], [58, 62, 66], clarte) + ")";
+      for (const r of rochers){
+        const bx = r.x * W, by = solY + relief(r.x * W) - r.h * .18;
+        ctx.beginPath();
+        ctx.moveTo(bx - r.w, by + r.h);
+        ctx.lineTo(bx - r.w * .62, by - r.h * .5);
+        ctx.lineTo(bx + r.w * .1, by - r.h);
+        ctx.lineTo(bx + r.w * .78, by - r.h * .34);
+        ctx.lineTo(bx + r.w, by + r.h);
+        ctx.closePath(); ctx.fill();
+      }
+
+      // le sol : sédiment sombre, éclairci près de la crête par la lampe
+      const sg = ctx.createLinearGradient(0, solY - 10 * dpr, 0, solY + Hh * .35);
+      sg.addColorStop(0, "rgb(" + mix([46, 50, 54], [214, 196, 152], clarte) + ")");
+      sg.addColorStop(1, "rgb(" + mix([6, 9, 14], [120, 106, 78], clarte) + ")");
+      ctx.fillStyle = sg;
+      ctx.beginPath(); ctx.moveTo(0, Hh + 40 * dpr); ctx.lineTo(0, solY + relief(0));
+      for (let x = 0; x <= W; x += 18 * dpr) ctx.lineTo(x, solY + relief(x));
+      ctx.lineTo(W, Hh + 40 * dpr); ctx.closePath(); ctx.fill();
+
+      // grains clairs sur le sédiment, pour casser l'aplat
+      ctx.fillStyle = "rgba(190,205,215,.10)";
+      for (const gr of grains){
+        const gx = gr.x * W, gy = solY + relief(gx) + gr.y * Hh * .3;
+        if (gy > Hh + 20 * dpr) continue;
+        ctx.beginPath(); ctx.arc(gx, gy, gr.r * dpr, 0, 6.283); ctx.fill();
+      }
 
       if (aDebloque("algues")){
         ctx.strokeStyle = "rgba(" + mix([16, 52, 46], [56, 164, 96], clarte) + ",.9)";
         ctx.lineCap = "round";
         for (const hb of herbes){
-          const base = solY + Math.sin(hb.x * .011) * 11 * dpr;
+          const hx = hb.x * W, base = solY + relief(hx);
           ctx.lineWidth = hb.w;
-          ctx.beginPath(); ctx.moveTo(hb.x, base);
-          ctx.quadraticCurveTo(hb.x + Math.sin(t0 * 1.1 + hb.ph) * 18 * dpr, base - hb.h * .58,
-                               hb.x + Math.sin(t0 * 1.1 + hb.ph) * 27 * dpr, base - hb.h);
+          ctx.beginPath(); ctx.moveTo(hx, base);
+          ctx.quadraticCurveTo(hx + Math.sin(t0 * 1.1 + hb.ph) * 18 * dpr, base - hb.h * .58,
+                               hx + Math.sin(t0 * 1.1 + hb.ph) * 27 * dpr, base - hb.h);
           ctx.stroke();
         }
       }
       if (aDebloque("tresor")){               // coffre ouvert, or qui déborde
         // à droite du compteur : au centre, le coffre passerait sous les chiffres
-        const cx = W * .87, cy = solY + Math.sin(cx * .011) * 11 * dpr - 16 * dpr, s = dpr;
+        const cx = W * .87, cy = solY + relief(cx) - 16 * dpr, s = dpr;
         ctx.save(); ctx.translate(cx, cy);
         ctx.fillStyle = "rgb(" + mix([26, 22, 18], [96, 62, 32], clarte) + ")";
         ctx.fillRect(-28 * s, 0, 56 * s, 22 * s);                          // caisse
