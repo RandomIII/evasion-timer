@@ -1276,8 +1276,8 @@
     Clown_Fish:           { t:.70, v:1.05, nage:"ondule"  },
     butterfly_fish:       { t:.72, v:1.00, nage:"ondule"  },
     surgeonfish:          { t:.85, v:1.15, nage:"ondule"  },
-    Zebra_Turkeyfish:     { t:1.00, v:.45, nage:"derive"  },
-    Puffer_Fish:          { t:.90, v:.55, nage:"derive"  },
+    Zebra_Turkeyfish:     { t:1.00, v:.50, nage:"planeur" },   // avance lentement, sans à-coups
+    Puffer_Fish:          { t:.90, v:.60, nage:"planeur" },
 
     Tuna:                 { t:1.55, v:1.75, nage:"planeur" },
     "Mahi-Mahi":          { t:1.40, v:1.60, nage:"ondule"  },
@@ -1292,8 +1292,8 @@
     Sea_Butterfly:        { t:.50, v:.22, nage:"derive"  },
     Squid:                { t:1.15, v:.85, nage:"jet"     },
 
-    Football_Fish:        { t:1.00, v:.40, nage:"derive"  },
-    Gold_Football_Fish:   { t:1.05, v:.40, nage:"derive"  },
+    Football_Fish:        { t:1.00, v:.38, nage:"planeur" },   // il patrouille, leurre en avant
+    Gold_Football_Fish:   { t:1.05, v:.38, nage:"planeur" },
     Barreleye:            { t:.68, v:.50, nage:"ondule"  },
     Coelacanth:           { t:1.50, v:.45, nage:"planeur" }
   };
@@ -1434,34 +1434,19 @@
     }
     return emSprites[cle] = c;
   }
-  const N_TRANCHES = 11;
-  // amplitude et cadence de l'ondulation selon le style de nage
-  const ONDE = { ondule:  { a:.055, f:3.4 }, planeur: { a:.020, f:1.5 },
-                 derive:  { a:.030, f:1.1 }, jet:     { a:0,    f:0   },
-                 meduse:  { a:0,    f:0   } };
+  /* Le sprite est dessiné d'un bloc. Le découpage en tranches ondulantes déchirait
+     les dessins fournis — sur un emoji ça passait, sur un vrai poisson c'est laid.
+     Seuls calmar et méduse gardent une contraction du corps, qui EST leur nage. */
   function poissonEmoji(c, s, t){
     const sp = spriteEmoji(s.em);
     if (!sp) return;                          // sprite pas encore prêt
     const d = s.t * 3.2;
-
-    // calmar et méduse ne se tortillent pas : ils se contractent puis se détendent
     if (s.nage === "jet" || s.nage === "meduse"){
       const vite = s.nage === "jet" ? 1.5 : 1.1;
       const pomp = Math.sin(t * vite + s.ph);
-      c.scale(1 + pomp * .13, 1 - pomp * .11);
-      c.drawImage(sp, -d / 2, -d / 2, d, d);
-      return;
+      c.scale(1 + pomp * .10, 1 - pomp * .09);
     }
-
-    const o = ONDE[s.nage] || ONDE.ondule;
-    const sw = sp.width / N_TRANCHES, dw = d / N_TRANCHES;
-    for (let i = 0; i < N_TRANCHES; i++){
-      const u = i / (N_TRANCHES - 1);            // 0 = tête, 1 = queue
-      // l'onde remonte le corps ; l'amplitude enfle vers la queue
-      const dy = Math.sin(t * o.f + s.ph - u * 3.2) * d * o.a * (.15 + u);
-      c.drawImage(sp, i * sw, 0, sw, sp.height,
-                  -d / 2 + i * dw, -d / 2 + dy, dw + .7, d);   // +.7 : pas de couture
-    }
+    c.drawImage(sp, -d / 2, -d / 2, d, d);
   }
   function meduse(c, s, t0){                   // ombrelle translucide + tentacules
     const pulse = 1 + Math.sin(t0 * 1.5 + s.ph) * .13, R = s.t * 1.15;
@@ -1655,45 +1640,79 @@
     }
 
     // ---- la plaine abyssale, qui surgit dans les dernières secondes ----
-    if (solY < Hh + 60 * dpr){
-      const relief = x => Math.sin(x * .011) * 11 * dpr + Math.sin(x * .0037 + 2) * 18 * dpr;
+    if (solY < Hh + 80 * dpr){
+      /* Trois crêtes superposées : la plus lointaine est claire et voilée de
+         particules, la plus proche est presque noire. C'est cet écart de valeur
+         qui crée le relief — une seule silhouette rendait le sol plat. */
+      const CRETES = [
+        { dy:-58, amp:26, fq:.0034, ph:0,   h:[36, 56, 72], b:[20, 34, 46], voile:.30 },
+        { dy:-27, amp:17, fq:.0061, ph:2.1, h:[24, 38, 52], b:[12, 21, 30], voile:.16 },
+        { dy:  0, amp:11, fq:.0104, ph:4.2, h:[15, 24, 34], b:[5,  9,  15], voile:0   }
+      ];
+      const ligne = (c, x) => solY + c.dy * dpr
+                  + (Math.sin(x * c.fq + c.ph) + Math.sin(x * c.fq * 2.7 + c.ph * 2) * .45)
+                    * c.amp * dpr;
+      // en eau claire (monde peu profond) le sédiment vire au sable
+      const teinte = (v, k) => mix(v, [206 - k * 30, 188 - k * 26, 148 - k * 22], clarte * .8);
 
-      // voile de sédiment en suspension juste au-dessus du sol
-      const hz = ctx.createLinearGradient(0, solY - 120 * dpr, 0, solY + 20 * dpr);
-      hz.addColorStop(0, "rgba(90,120,140,0)");
-      hz.addColorStop(1, "rgba(90,120,140,.16)");
-      ctx.fillStyle = hz; ctx.fillRect(0, solY - 120 * dpr, W, 140 * dpr);
+      for (let i = 0; i < CRETES.length; i++){
+        const c = CRETES[i];
+        const g2 = ctx.createLinearGradient(0, ligne(c, W * .5) - 20 * dpr, 0, Hh);
+        g2.addColorStop(0, "rgb(" + teinte(c.h, i) + ")");
+        g2.addColorStop(1, "rgb(" + teinte(c.b, i) + ")");
+        ctx.fillStyle = g2;
+        ctx.beginPath(); ctx.moveTo(0, Hh + 60 * dpr); ctx.lineTo(0, ligne(c, 0));
+        for (let x = 0; x <= W; x += 14 * dpr) ctx.lineTo(x, ligne(c, x));
+        ctx.lineTo(W, Hh + 60 * dpr); ctx.closePath(); ctx.fill();
 
-      // rochers en silhouette, posés derrière le sol
-      ctx.fillStyle = "rgb(" + mix([9, 13, 20], [58, 62, 66], clarte) + ")";
-      for (const r of rochers){
-        const bx = r.x * W, by = solY + relief(r.x * W) - r.h * .18;
-        ctx.beginPath();
-        ctx.moveTo(bx - r.w, by + r.h);
-        ctx.lineTo(bx - r.w * .62, by - r.h * .5);
-        ctx.lineTo(bx + r.w * .1, by - r.h);
-        ctx.lineTo(bx + r.w * .78, by - r.h * .34);
-        ctx.lineTo(bx + r.w, by + r.h);
-        ctx.closePath(); ctx.fill();
+        if (c.voile){                        // particules en suspension devant la crête
+          const hz = ctx.createLinearGradient(0, ligne(c, W * .5) - 70 * dpr,
+                                              0, ligne(c, W * .5) + 90 * dpr);
+          hz.addColorStop(0, "rgba(120,158,180,0)");
+          hz.addColorStop(.5, "rgba(120,158,180," + c.voile * .5 + ")");
+          hz.addColorStop(1, "rgba(120,158,180,0)");
+          ctx.fillStyle = hz;
+          ctx.fillRect(0, ligne(c, W * .5) - 70 * dpr, W, 160 * dpr);
+        }
+
+        if (i === 1){                        // rochers posés sur la crête médiane
+          ctx.fillStyle = "rgb(" + teinte([10, 17, 25], 2) + ")";
+          for (const r of rochers){
+            const bx = r.x * W, by = ligne(c, bx) + 4 * dpr;
+            ctx.beginPath();
+            ctx.moveTo(bx - r.w, by);
+            ctx.quadraticCurveTo(bx - r.w * .8, by - r.h * .9, bx - r.w * .15, by - r.h);
+            ctx.quadraticCurveTo(bx + r.w * .55, by - r.h * .85, bx + r.w, by);
+            ctx.closePath(); ctx.fill();
+            ctx.strokeStyle = "rgba(150,196,220,.14)";   // arête éclairée par la lampe
+            ctx.lineWidth = 1.6 * dpr;
+            ctx.beginPath();
+            ctx.moveTo(bx - r.w * .8, by - r.h * .55);
+            ctx.quadraticCurveTo(bx - r.w * .15, by - r.h, bx + r.w * .55, by - r.h * .8);
+            ctx.stroke();
+          }
+        }
       }
 
-      // le sol : sédiment sombre, éclairci près de la crête par la lampe
-      const sg = ctx.createLinearGradient(0, solY - 10 * dpr, 0, solY + Hh * .35);
-      sg.addColorStop(0, "rgb(" + mix([46, 50, 54], [214, 196, 152], clarte) + ")");
-      sg.addColorStop(1, "rgb(" + mix([6, 9, 14], [120, 106, 78], clarte) + ")");
-      ctx.fillStyle = sg;
-      ctx.beginPath(); ctx.moveTo(0, Hh + 40 * dpr); ctx.lineTo(0, solY + relief(0));
-      for (let x = 0; x <= W; x += 18 * dpr) ctx.lineTo(x, solY + relief(x));
-      ctx.lineTo(W, Hh + 40 * dpr); ctx.closePath(); ctx.fill();
+      // liseré lumineux sur la crête la plus proche : donne son volume au sol
+      const near = CRETES[2];
+      ctx.strokeStyle = "rgba(168,214,236,.22)"; ctx.lineWidth = 2 * dpr;
+      ctx.beginPath();
+      for (let x = 0; x <= W; x += 14 * dpr) ctx.lineTo(x, ligne(near, x));
+      ctx.stroke();
 
-      // grains clairs sur le sédiment, pour casser l'aplat
-      ctx.fillStyle = "rgba(190,205,215,.10)";
+      const relief = x => ligne(near, x) - solY;   // repère pour algues et coffre
+
+      // organismes lumineux nichés dans le sédiment, écho aux motes de l'eau
+      ctx.globalCompositeOperation = "lighter";
       for (const gr of grains){
-        const gx = gr.x * W, gy = solY + relief(gx) + gr.y * Hh * .3;
+        const gx = gr.x * W, gy = ligne(near, gx) + gr.y * Hh * .22;
         if (gy > Hh + 20 * dpr) continue;
-        ctx.beginPath(); ctx.arc(gx, gy, gr.r * dpr, 0, 6.283); ctx.fill();
+        const pulse = .35 + Math.sin(t0 * 1.3 + gr.x * 40) * .65;
+        ctx.fillStyle = "rgba(150,235,215," + (.16 * Math.max(0, pulse)) + ")";
+        ctx.beginPath(); ctx.arc(gx, gy, gr.r * 2.6 * dpr, 0, 6.283); ctx.fill();
       }
-
+      ctx.globalCompositeOperation = "source-over";
       if (aDebloque("algues")){
         ctx.strokeStyle = "rgba(" + mix([16, 52, 46], [56, 164, 96], clarte) + ",.9)";
         ctx.lineCap = "round";
@@ -1749,20 +1768,24 @@
       for (const s of nageurs){
         // chaque style avance à sa manière : le calmar pousse puis glisse,
         // la méduse dérive en tanguant, le grand nageur file droit.
-        let allure = 1, monteeY = Math.sin(t0 * 1.6 + s.ph) * .5;
+        // Le tangage est proportionnel à l'allure : sinon un poisson lent oscille
+        // plus qu'il n'avance et donne l'impression de faire du surplace.
+        const bob = s.v / dpr * .30;
+        let allure = 1, monteeY = Math.sin(t0 * 1.4 + s.ph) * bob;
         if (s.nage === "jet"){
           const poussee = Math.max(0, Math.sin(t0 * 1.5 + s.ph));
           allure = .2 + poussee * poussee * 2.1;
+          monteeY = Math.sin(t0 * .6 + s.ph) * bob * .5;
         } else if (s.nage === "meduse"){
           const pomp = Math.max(0, Math.sin(t0 * 1.1 + s.ph));
           allure = .35 + pomp * pomp * 1.2;
-          monteeY = Math.sin(t0 * 1.1 + s.ph) * 1.1;      // tangage vertical marqué
-        } else if (s.nage === "derive"){
-          allure = .8 + Math.sin(t0 * .5 + s.ph) * .25;
-          monteeY = Math.sin(t0 * .8 + s.ph) * .8;
+          monteeY = -Math.abs(Math.sin(t0 * 1.1 + s.ph)) * bob * 2;  // se hisse à chaque pulsation
         } else if (s.nage === "planeur"){
-          allure = 1;                                      // allure régulière, sans à-coups
-          monteeY = Math.sin(t0 * .7 + s.ph) * .35;
+          allure = 1;                                      // droit, sans à-coups
+          monteeY = Math.sin(t0 * .45 + s.ph) * bob * .5;
+        } else if (s.nage === "derive"){
+          allure = .85 + Math.sin(t0 * .5 + s.ph) * .15;
+          monteeY = Math.sin(t0 * 1.8 + s.ph) * bob * 1.4; // voltige des tout petits
         }
         s.x += s.v * s.dir * lent * allure;
         s.y += monteeY * dpr * lent;
