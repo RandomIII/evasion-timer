@@ -1113,7 +1113,7 @@
              v: (Math.random() * .9 + .35) * dpr,
              t: (Math.random() * 8 + 9) * dpr,
              ph: Math.random() * 6.3, zone,
-             teinte: 24 + Math.random() * 34 };
+             em: (FAUNE[zone] || [])[(Math.random() * 3) | 0] || "🐟" };
   };
   function initAbysses(){
     if (abyssPret) return;
@@ -1128,31 +1128,18 @@
   }
   const mix = (a, b, t) => a.map((v, i) => Math.round(v + (b[i] - v) * t));
 
-  /* ---- dessins des créatures, chacun avec sa silhouette ---- */
-  function poissonRecif(c, s, clarte){         // corps rond, queue en éventail, rayé
-    c.fillStyle = "hsla(" + (28 + s.teinte) + ",85%," + (46 + clarte * 18) + "%,.95)";
-    c.beginPath(); c.ellipse(0, 0, s.t, s.t * .58, 0, 0, 6.283); c.fill();
-    c.beginPath(); c.moveTo(-s.t * .92, 0);
-    c.lineTo(-s.t * 1.75, -s.t * .62); c.lineTo(-s.t * 1.62, 0);
-    c.lineTo(-s.t * 1.75, s.t * .62); c.closePath(); c.fill();
-    c.fillStyle = "rgba(255,255,255,.30)";      // rayures
-    for (let k = -1; k <= 1; k++){
-      c.beginPath(); c.ellipse(k * s.t * .34, 0, s.t * .10, s.t * .5, 0, 0, 6.283); c.fill();
-    }
-    c.beginPath(); c.arc(s.t * .62, -s.t * .16, s.t * .12, 0, 6.283);   // œil
-    c.fillStyle = "rgba(10,20,30,.9)"; c.fill();
-  }
-  function poissonLarge(c, s, clarte){         // fuselé, argenté, queue fourchue
-    const g = c.createLinearGradient(0, -s.t * .4, 0, s.t * .4);
-    g.addColorStop(0, "rgba(206,226,238," + (.5 + clarte * .4) + ")");
-    g.addColorStop(1, "rgba(96,132,158," + (.5 + clarte * .4) + ")");
-    c.fillStyle = g;
-    c.beginPath(); c.ellipse(0, 0, s.t * 1.35, s.t * .34, 0, 0, 6.283); c.fill();
-    c.beginPath(); c.moveTo(-s.t * 1.3, 0);
-    c.lineTo(-s.t * 2.1, -s.t * .5); c.lineTo(-s.t * 1.72, 0);
-    c.lineTo(-s.t * 2.1, s.t * .5); c.closePath(); c.fill();
-    c.beginPath(); c.moveTo(-s.t * .1, -s.t * .32);                     // aileron dorsal
-    c.lineTo(s.t * .3, -s.t * .78); c.lineTo(s.t * .5, -s.t * .28); c.closePath(); c.fill();
+  /* ---- créatures ----
+     Récif et pleine eau utilisent des emoji : jeu d'assets plat et universel, déjà
+     employé pour la pause repas, et disponible hors ligne. Les deux créatures
+     signature restent dessinées : aucun emoji de poisson-lanterne n'existe, et
+     celui de méduse est trop récent pour s'afficher partout. */
+  const FAUNE = { recif: ["🐠", "🐟", "🐡"], large: ["🐟", "🐬", "🦈"] };
+  function poissonEmoji(c, s, clarte){
+    c.globalAlpha = .62 + clarte * .35;
+    c.font = (s.t * 3.2) + 'px "Segoe UI Emoji","Apple Color Emoji","Noto Color Emoji",sans-serif';
+    c.textAlign = "center"; c.textBaseline = "middle";
+    c.fillText(s.em, 0, 0);
+    c.globalAlpha = 1;
   }
   function meduse(c, s, t0){                   // ombrelle translucide + tentacules
     const pulse = 1 + Math.sin(t0 * 1.5 + s.ph) * .13, R = s.t * 1.15;
@@ -1389,11 +1376,15 @@
         s.x += s.v * s.dir * lent;
         s.y += Math.sin(t0 * 1.6 + s.ph) * .5 * dpr;
         if (s.dir > 0 ? s.x > W + 90 * dpr : s.x < -90 * dpr) Object.assign(s, seedNageur(zone));
-        ctx.save(); ctx.translate(s.x, s.y); ctx.scale(s.dir, 1);
-        if (zone === "recif")        poissonRecif(ctx, s, clarte);
-        else if (zone === "large")   poissonLarge(ctx, s, clarte);
-        else if (zone === "meduses") meduse(ctx, s, t0);
-        else                         poissonLanterne(ctx, s, t0);   // abysse et fosse
+        ctx.save(); ctx.translate(s.x, s.y);
+        if (zone === "recif" || zone === "large"){
+          ctx.scale(-s.dir, 1);            // les emoji poissons regardent à gauche
+          poissonEmoji(ctx, s, clarte);
+        } else {
+          ctx.scale(s.dir, 1);
+          if (zone === "meduses") meduse(ctx, s, t0);
+          else                    poissonLanterne(ctx, s, t0);   // abysse et fosse
+        }
         ctx.restore();
       }
     }
