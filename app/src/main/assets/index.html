@@ -1104,14 +1104,17 @@
   const plancton = [], nageurs = [], bulles = [], herbes = [];
   let baleine = null, abyssPret = false;
 
-  // enPlace : répartir d'emblée sur la largeur, sinon la zone paraît vide au changement
+  // enPlace : répartir d'emblée sur la largeur, sinon la zone paraît vide au changement.
+  // d = éloignement (0 tout près, 1 au loin) : pilote ensemble opacité, taille et
+  // vitesse, ce qui donne une vraie parallaxe plutôt qu'une transparence aléatoire.
   const seedNageur = (zone, enPlace) => {
-    const versDroite = Math.random() < .5;
+    const versDroite = Math.random() < .5, d = Math.random();
     return { x: enPlace ? Math.random() * W : (versDroite ? -70 * dpr : W + 70 * dpr),
              y: Hh * (.08 + Math.random() * .84),
-             dir: versDroite ? 1 : -1,
-             v: (Math.random() * .9 + .35) * dpr,
-             t: (Math.random() * 8 + 9) * dpr,
+             dir: versDroite ? 1 : -1, d,
+             v: (Math.random() * .9 + .35) * (1 - d * .6) * dpr,
+             t: (Math.random() * 8 + 9) * (1 - d * .45) * dpr,
+             op: 1 - d * .5,
              ph: Math.random() * 6.3, zone,
              em: (FAUNE[zone] || [])[(Math.random() * 3) | 0] || "🐟" };
   };
@@ -1134,12 +1137,10 @@
      signature restent dessinées : aucun emoji de poisson-lanterne n'existe, et
      celui de méduse est trop récent pour s'afficher partout. */
   const FAUNE = { recif: ["🐠", "🐟", "🐡"], large: ["🐟", "🐬", "🦈"] };
-  function poissonEmoji(c, s, clarte){
-    c.globalAlpha = .62 + clarte * .35;
+  function poissonEmoji(c, s){
     c.font = (s.t * 3.2) + 'px "Segoe UI Emoji","Apple Color Emoji","Noto Color Emoji",sans-serif';
     c.textAlign = "center"; c.textBaseline = "middle";
     c.fillText(s.em, 0, 0);
-    c.globalAlpha = 1;
   }
   function meduse(c, s, t0){                   // ombrelle translucide + tentacules
     const pulse = 1 + Math.sin(t0 * 1.5 + s.ph) * .13, R = s.t * 1.15;
@@ -1377,14 +1378,17 @@
         s.y += Math.sin(t0 * 1.6 + s.ph) * .5 * dpr;
         if (s.dir > 0 ? s.x > W + 90 * dpr : s.x < -90 * dpr) Object.assign(s, seedNageur(zone));
         ctx.save(); ctx.translate(s.x, s.y);
+        // l'éloignement estompe la créature, et l'eau trouble l'estompe encore
+        ctx.globalAlpha = s.op * (.7 + clarte * .3);
         if (zone === "recif" || zone === "large"){
           ctx.scale(-s.dir, 1);            // les emoji poissons regardent à gauche
-          poissonEmoji(ctx, s, clarte);
+          poissonEmoji(ctx, s);
         } else {
           ctx.scale(s.dir, 1);
           if (zone === "meduses") meduse(ctx, s, t0);
           else                    poissonLanterne(ctx, s, t0);   // abysse et fosse
         }
+        ctx.globalAlpha = 1;
         ctx.restore();
       }
     }
