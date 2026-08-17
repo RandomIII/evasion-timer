@@ -1294,7 +1294,7 @@
     return mix(CIEL[ETAGES[i]][cle], CIEL[ETAGES[i + 1]][cle], t);
   }
 
-  const etoiles = [], nuees = [], feuilles = [], oiseaux = [], petales = [];
+  const etoiles = [], nuees = [], feuilles = [], oiseaux = [], petales = [], pollen = [];
   let arbrePret = false, altM = 0;
   function initArbre(){
     if (arbrePret) return;
@@ -1311,10 +1311,31 @@
                       r: (Math.random() * 5 + 4), rot: Math.random() * 6.3,
                       vr: (Math.random() - .5) * .05, v: Math.random() * .5 + .3,
                       h: 92 + Math.random() * 46 });
+    for (let i = 0; i < 70; i++)
+      pollen.push({ x: Math.random() * W, y: Math.random() * Hh,
+                    r: Math.random() * 1.5 + .5, v: Math.random() * .5 + .2,
+                    ph: Math.random() * 6.3 });
     for (let i = 0; i < 8; i++)
       oiseaux.push({ x: Math.random() * W, y: Math.random() * Hh * .7,
                      dir: Math.random() < .5 ? 1 : -1, v: Math.random() * 1.2 + .8,
                      ph: Math.random() * 6.3, t: Math.random() * 5 + 6 });
+  }
+
+  /* nuage : amas de bouffées à bord fondu. Le sprite est calculé une fois — des
+     ellipses pleines donnaient des galets gris, il faut un dégradé pour du coton. */
+  let bouffee = null;
+  function spriteBouffee(){
+    if (bouffee) return bouffee;
+    bouffee = document.createElement("canvas");
+    bouffee.width = bouffee.height = 128;
+    const g = bouffee.getContext("2d");
+    const gr = g.createRadialGradient(64, 64, 0, 64, 64, 64);
+    gr.addColorStop(0,   "rgba(255,255,255,1)");
+    gr.addColorStop(.42, "rgba(255,255,255,.72)");
+    gr.addColorStop(.74, "rgba(255,255,255,.24)");
+    gr.addColorStop(1,   "rgba(255,255,255,0)");
+    g.fillStyle = gr; g.fillRect(0, 0, 128, 128);
+    return bouffee;
   }
 
   function dessineArbre(prog, enPause, alerte, libre, secDep){
@@ -1322,112 +1343,168 @@
     const p = Math.max(0, Math.min(1, prog));
     const lent = reduce ? .35 : 1;
     const AM = altMax();
-    altM = AM * p;                                   // on MONTE : 0 le matin, AM le soir
+    altM = AM * p;                                   // montée uniforme sur la journée
     const t0 = performance.now() / 1000;
     const fe = libre ? 4 : etageFlot(secDep);
     const etage = libre ? "espace" : etageDe(secDep);
-    const nuit = Math.min(1, Math.max(0, (fe - 2.1) / 1.9));   // 0 = jour, 1 = espace
+    const nuit = Math.min(1, Math.max(0, (fe - 2.1) / 1.9));
     const E = ech() * dpr;
 
-    // le ciel
+    // ---- le ciel ----
     const g = ctx.createLinearGradient(0, 0, 0, Hh);
     g.addColorStop(0, "rgb(" + couleurCiel(fe, "h") + ")");
     g.addColorStop(1, "rgb(" + couleurCiel(fe, "b") + ")");
     ctx.fillStyle = g; ctx.fillRect(0, 0, W, Hh);
 
-    // les étoiles se révèlent en s'élevant
+    // étoiles, révélées par l'altitude
     if (nuit > .02){
       for (const e of etoiles){
         const a = nuit * (.35 + Math.sin(t0 * 1.4 + e.ph) * .3 + .35);
         ctx.fillStyle = "rgba(255,252,238," + Math.max(0, a) + ")";
-        ctx.beginPath();
-        ctx.arc(e.x * W, e.y * Hh * .92, e.r * E, 0, 6.283); ctx.fill();
+        ctx.beginPath(); ctx.arc(e.x * W, e.y * Hh * .92, e.r * E, 0, 6.283); ctx.fill();
       }
     }
 
-    // le soleil descend et rougit à mesure qu'on s'élève
-    const sy = Hh * (.16 + fe * .1), sr = 46 * E;
+    // ---- le soleil et ses rayons crépusculaires ----
+    const sx = W * .78, sy = Hh * (.14 + fe * .09), sr = 46 * E;
+    const cs = mix([255, 246, 206], [255, 132, 92], Math.min(1, fe / 3));
+    const jour = 1 - nuit;
     ctx.globalCompositeOperation = "lighter";
-    const sg = ctx.createRadialGradient(W * .78, sy, 0, W * .78, sy, sr * 5);
-    const cs = mix([255, 246, 206], [255, 138, 96], Math.min(1, fe / 3));
-    sg.addColorStop(0, "rgba(" + cs + "," + (.5 - nuit * .42) + ")");
+    const sg = ctx.createRadialGradient(sx, sy, 0, sx, sy, sr * 6);
+    sg.addColorStop(0, "rgba(" + cs + "," + (.45 * jour) + ")");
     sg.addColorStop(1, "rgba(" + cs + ",0)");
     ctx.fillStyle = sg; ctx.fillRect(0, 0, W, Hh);
+    if (jour > .06){                                 // faisceaux qui balaient le ciel
+      ctx.save();
+      ctx.translate(sx, sy); ctx.rotate(2.6 + Math.sin(t0 * .05) * .05);
+      const L = Math.max(W, Hh) * 1.7;
+      for (let i = 0; i < 9; i++){
+        const a = i * .21 + Math.sin(t0 * .12 + i) * .02;
+        const larg = (.028 + Math.sin(t0 * .3 + i * 1.7) * .012);
+        const rg = ctx.createLinearGradient(0, 0, Math.cos(a) * L, Math.sin(a) * L);
+        rg.addColorStop(0,  "rgba(" + cs + "," + (.10 * jour) + ")");
+        rg.addColorStop(.5, "rgba(" + cs + "," + (.045 * jour) + ")");
+        rg.addColorStop(1,  "rgba(" + cs + ",0)");
+        ctx.fillStyle = rg;
+        ctx.beginPath(); ctx.moveTo(0, 0);
+        ctx.lineTo(Math.cos(a - larg) * L, Math.sin(a - larg) * L);
+        ctx.lineTo(Math.cos(a + larg) * L, Math.sin(a + larg) * L);
+        ctx.closePath(); ctx.fill();
+      }
+      ctx.restore();
+    }
     ctx.globalCompositeOperation = "source-over";
-    if (nuit < .85){
-      ctx.fillStyle = "rgba(" + cs + "," + (.9 - nuit) + ")";
-      ctx.beginPath(); ctx.arc(W * .78, sy, sr, 0, 6.283); ctx.fill();
+    if (jour > .12){
+      ctx.fillStyle = "rgba(" + cs + "," + (.92 * jour) + ")";
+      ctx.beginPath(); ctx.arc(sx, sy, sr, 0, 6.283); ctx.fill();
     }
 
-    // ---- géométrie verticale : le grimpeur est fixe, le monde défile ----
-    const dy = Hh * .52, SPAN = Hh * 3;
-    const solY  = dy + p * SPAN;                     // le sol s'éloigne vers le bas
-    const cimeY = dy - (1 - p) * SPAN;               // la cime nous précède
+    /* ---- géométrie : la caméra reste sur la CIME ----
+       Le sommet est fixe à l'écran, l'arbre s'allonge vers le bas et le sol
+       s'éloigne. L'avancement est strictement proportionnel au temps : pas
+       d'accélération à l'approche du départ, contrairement aux autres mondes. */
+    const cimeY = Hh * .34;
+    const SPAN = Hh * 4.2;
+    const solY = cimeY + p * SPAN;
 
-    // nuées, en parallaxe : elles descendent puisqu'on monte
-    for (const n of nuees){
-      const par = .3 + n.c * .7;
-      const y = (((n.y + p * 5 * par) % 1) + 1) % 1 * (Hh + 300 * E) - 150 * E;
-      const x = n.x * W + Math.sin(t0 * n.v * .2 + n.y * 9) * 40 * E;
-      const L = n.l * W, H2 = L * .22 * n.e;
-      // les nuages n'existent qu'à leur étage : absents au sol, disparus au-dessus
-      // de la troposphère. Sans cette borne ils flottaient encore à 40 km.
-      const bande = Math.max(0, Math.min(1, (fe - .3) / .9))
-                  * Math.max(0, Math.min(1, (3.15 - fe) / .7));
-      const op = (.55 + n.c * .4) * bande;
-      if (op <= .015) continue;
-      ctx.fillStyle = "rgba(255,252,248," + op + ")";
-      for (let k = 0; k < 5; k++){                   // amas de boules = nuage
-        const bx = x + (k - 2) * L * .19;
-        const br = H2 * (1 - Math.abs(k - 2) * .22);
-        ctx.beginPath(); ctx.ellipse(bx, y, br * 1.5, br, 0, 0, 6.283); ctx.fill();
+    // ---- nuages : bouffées douces, en parallaxe, cantonnées à leur étage ----
+    const bande = Math.max(0, Math.min(1, (fe - .35) / .85))
+                * Math.max(0, Math.min(1, (3.1 - fe) / .75));
+    if (bande > .015){
+      const sp = spriteBouffee();
+      for (const n of nuees){
+        const par = .35 + n.c * .65;                 // les proches défilent plus vite
+        const yv = (((n.y + p * 3.2 * par) % 1) + 1) % 1;
+        const y = yv * (Hh + 420 * E) - 210 * E;
+        const x = n.x * W + Math.sin(t0 * .06 + n.y * 9) * 30 * E;
+        const L = n.l * W * (.5 + n.e * .45);
+        // opacité franche et bouffées resserrées : trop étalées, elles viraient au brouillard
+        const op = bande * (.55 + n.c * .35) * (.6 + par * .4);
+        ctx.globalAlpha = Math.min(1, op);
+        for (let k = 0; k < 7; k++){                 // bouffées décalées = volume
+          const u = k / 6 - .5;
+          const d2 = L * (.78 - Math.abs(u) * .38) * (1 + Math.sin(k * 2.1 + n.y * 7) * .16);
+          ctx.drawImage(sp, x + u * L * .62 - d2 / 2,
+                            y - d2 * .3 + Math.sin(k * 1.7 + n.y * 5) * L * .06,
+                            d2, d2 * .72);
+        }
+        ctx.globalAlpha = 1;
       }
     }
 
-    // ---- le tronc, qui défile vers le bas ----
+    // ---- pollen : poussière qui monte dans la lumière ----
+    if (jour > .08){
+      ctx.globalCompositeOperation = "lighter";
+      for (const q of pollen){
+        q.y -= q.v * lent * E * .35;
+        q.x += Math.sin(q.y * .012 + q.ph) * .3 * E;
+        if (q.y < -6 * E){ q.y = Hh + 6 * E; q.x = Math.random() * W; }
+        const sc = .35 + Math.sin(t0 * 1.6 + q.ph) * .3 + .35;
+        ctx.fillStyle = "rgba(255,244,208," + (jour * .3 * sc) + ")";
+        ctx.beginPath(); ctx.arc(q.x, q.y, q.r * E, 0, 6.283); ctx.fill();
+      }
+      ctx.globalCompositeOperation = "source-over";
+    }
+
+    // ---- le tronc, qui plonge sous la cime ----
     const tx = W * .17;
-    const largeur = y => (10 + (y - cimeY) / Math.max(1, solY - cimeY) * 44) * E;
-    if (solY > -60 * E && cimeY < Hh + 60 * E){
-      const gt = ctx.createLinearGradient(tx - 40 * E, 0, tx + 40 * E, 0);
-      gt.addColorStop(0,  "rgb(" + mix([44, 30, 20], [96, 68, 44], .35) + ")");
-      gt.addColorStop(.45,"rgb(" + mix([96, 68, 44], [148, 112, 72], .4) + ")");
-      gt.addColorStop(1,  "rgb(" + mix([34, 24, 16], [72, 50, 32], .3) + ")");
+    const largeur = y => (7 + Math.max(0, y - cimeY) / Math.max(1, SPAN) * 190) * E;
+    {
+      const gt = ctx.createLinearGradient(tx - 46 * E, 0, tx + 46 * E, 0);
+      gt.addColorStop(0,  "rgb(38,26,17)");
+      gt.addColorStop(.42,"rgb(112,80,50)");
+      gt.addColorStop(.72,"rgb(86,60,38)");
+      gt.addColorStop(1,  "rgb(32,22,15)");
       ctx.fillStyle = gt;
+      const y1 = Math.min(solY, Hh + 60 * E);
       ctx.beginPath();
-      const y0 = Math.max(cimeY, -60 * E), y1 = Math.min(solY, Hh + 60 * E);
-      for (let y = y0; y <= y1; y += 14 * E)
-        ctx.lineTo(tx - largeur(y) + Math.sin(y * .012) * 7 * E, y);
-      for (let y = y1; y >= y0; y -= 14 * E)
-        ctx.lineTo(tx + largeur(y) + Math.sin(y * .012) * 7 * E, y);
+      for (let y = cimeY; y <= y1; y += 12 * E)
+        ctx.lineTo(tx - largeur(y) + Math.sin(y * .009) * 8 * E, y);
+      for (let y = y1; y >= cimeY; y -= 12 * E)
+        ctx.lineTo(tx + largeur(y) + Math.sin(y * .009) * 8 * E, y);
       ctx.closePath(); ctx.fill();
 
-      if (aDebloque("algues")){                      // branches et feuillage
-        for (let k = 0; k < 9; k++){
-          const by = y0 + ((k * 137 + (p * 1600) % 137) % Math.max(1, y1 - y0));
+      if (aDebloque("algues")){                      // branches, plus amples vers le bas
+        for (let k = 0; k < 10; k++){
+          const by = cimeY + (k + .5) / 10 * (y1 - cimeY);
           const cote = k % 2 ? 1 : -1;
-          const lb = (40 + (by - cimeY) / Math.max(1, solY - cimeY) * 90) * E;
-          const bx = tx + Math.sin(by * .012) * 7 * E;
-          ctx.strokeStyle = "rgb(" + mix([48, 34, 22], [104, 76, 48], .4) + ")";
-          ctx.lineWidth = Math.max(2, largeur(by) * .3); ctx.lineCap = "round";
+          const lb = (26 + largeur(by) * 2.4) * 1;
+          const bx = tx + Math.sin(by * .009) * 8 * E;
+          ctx.strokeStyle = "rgb(74,52,33)";
+          ctx.lineWidth = Math.max(2 * E, largeur(by) * .26); ctx.lineCap = "round";
           ctx.beginPath(); ctx.moveTo(bx, by);
-          ctx.quadraticCurveTo(bx + cote * lb * .6, by - lb * .3,
-                               bx + cote * lb, by - lb * .5);
+          ctx.quadraticCurveTo(bx + cote * lb * .6, by - lb * .34,
+                               bx + cote * lb, by - lb * .55);
           ctx.stroke();
-          const fx = bx + cote * lb, fy = by - lb * .5;   // bouquet de feuilles
-          ctx.fillStyle = "rgba(" + mix([34, 92, 48], [122, 186, 96], .55)
-                        + "," + (.85 - nuit * .5) + ")";
-          for (let j = 0; j < 4; j++){
-            const a = j * 1.57 + k;
+          const fx = bx + cote * lb, fy = by - lb * .55;
+          const vert = mix([28, 78, 42], [128, 190, 100], .5 + Math.sin(k) * .2);
+          ctx.fillStyle = "rgba(" + vert + "," + (.9 - nuit * .55) + ")";
+          for (let j = 0; j < 5; j++){
+            const a = j * 1.257 + k;
             ctx.beginPath();
-            ctx.ellipse(fx + Math.cos(a) * lb * .22, fy + Math.sin(a) * lb * .18,
-                        lb * .3, lb * .22, a, 0, 6.283);
+            ctx.ellipse(fx + Math.cos(a) * lb * .26 + Math.sin(t0 * .8 + k) * 3 * E,
+                        fy + Math.sin(a) * lb * .2,
+                        lb * .3, lb * .23, a, 0, 6.283);
             ctx.fill();
           }
         }
       }
+      // la cime : bouquet terminal, toujours à l'écran puisqu'on la suit
+      if (aDebloque("algues")){
+        const vert = mix([32, 88, 46], [138, 200, 108], .55);
+        ctx.fillStyle = "rgba(" + vert + "," + (.95 - nuit * .5) + ")";
+        for (let j = 0; j < 7; j++){
+          const a = j * .897;
+          ctx.beginPath();
+          ctx.ellipse(tx + Math.cos(a) * 26 * E + Math.sin(t0 * .7 + j) * 3 * E,
+                      cimeY - 12 * E + Math.sin(a) * 16 * E,
+                      22 * E, 16 * E, a, 0, 6.283);
+          ctx.fill();
+        }
+      }
     }
 
-    // ---- le sol, visible au tout début ----
+    // ---- le sol, visible au début de la journée ----
     if (solY < Hh + 80 * E){
       ctx.fillStyle = "rgb(" + mix([58, 78, 44], [126, 158, 88], .55) + ")";
       ctx.beginPath(); ctx.moveTo(0, Hh + 60 * E); ctx.lineTo(0, solY);
@@ -1435,7 +1512,7 @@
         ctx.lineTo(x, solY + Math.sin(x * .009) * 12 * E);
       ctx.lineTo(W, Hh + 60 * E); ctx.closePath(); ctx.fill();
       ctx.strokeStyle = "rgba(78,128,62,.9)"; ctx.lineWidth = 2 * E; ctx.lineCap = "round";
-      for (let i = 0; i < 40; i++){                  // touffes d'herbe
+      for (let i = 0; i < 40; i++){
         const hx = (i * 97 % 1000) / 1000 * W;
         const hb = solY + Math.sin(hx * .009) * 12 * E;
         ctx.beginPath(); ctx.moveTo(hx, hb);
@@ -1443,7 +1520,7 @@
                              hx + Math.sin(t0 + i) * 9 * E, hb - 20 * E);
         ctx.stroke();
       }
-      if (aDebloque("tresor")){                      // nid posé sur une branche basse
+      if (aDebloque("tresor")){
         const nx = W * .74, ny = solY - 54 * E;
         ctx.fillStyle = "rgb(112,84,50)";
         ctx.beginPath(); ctx.ellipse(nx, ny, 26 * E, 13 * E, 0, 0, 6.283); ctx.fill();
@@ -1457,23 +1534,12 @@
       }
     }
 
-    // ---- montgolfière, à l'étage des nuages ----
+    // ---- montgolfière ----
     if (aDebloque("boat") && fe > .8 && fe < 3.4){
       const bx = W * .84 + Math.sin(t0 * .35) * 26 * E;
       const by = Hh * .34 + Math.sin(t0 * .5) * 18 * E;
       ctx.save(); ctx.translate(bx, by); ctx.rotate(Math.sin(t0 * .4) * .06);
-      const bg2 = ctx.createLinearGradient(-30 * E, 0, 30 * E, 0);
-      bg2.addColorStop(0, "#D9484F"); bg2.addColorStop(.5, "#F2E3C8");
-      bg2.addColorStop(1, "#D9484F");
-      ctx.fillStyle = bg2;
-      ctx.beginPath(); ctx.ellipse(0, 0, 30 * E, 36 * E, 0, Math.PI, 0); ctx.fill();
-      ctx.beginPath(); ctx.moveTo(-30 * E, 0);
-      ctx.quadraticCurveTo(0, 34 * E, 30 * E, 0); ctx.closePath(); ctx.fill();
-      ctx.strokeStyle = "rgba(60,42,28,.9)"; ctx.lineWidth = 1.6 * E;
-      ctx.beginPath(); ctx.moveTo(-11 * E, 30 * E); ctx.lineTo(-8 * E, 44 * E);
-      ctx.moveTo(11 * E, 30 * E); ctx.lineTo(8 * E, 44 * E); ctx.stroke();
-      ctx.fillStyle = "#8A5E34";
-      ctx.fillRect(-9 * E, 44 * E, 18 * E, 13 * E);
+      GRIMPEURS.ballon(ctx, E * .9, "rgba(255,220,150,.9)", t0);
       ctx.restore();
     }
 
@@ -1497,7 +1563,7 @@
       }
     }
 
-    // ---- feuilles qui tombent ----
+    // ---- feuilles emportées ----
     for (const f of feuilles){
       f.y += f.v * lent * E * .8;
       f.x += Math.sin(f.y * .02 + f.rot) * .8 * E;
@@ -1509,17 +1575,17 @@
       ctx.restore();
     }
 
-    // ---- le grimpeur, dont le moyen de transport suit l'altitude ----
+    // ---- le grimpeur, accroché à la cime qu'on suit ----
     if (aDebloque("diver")){
       const monte = { sol:"ecureuil", canopee:"oiseau", nuages:"ballon",
                       strato:"fusee", espace:"fusee" }[etage];
-      const ballant = Math.sin(t0 * 1.3) * 8 * E;
-      ctx.save(); ctx.translate(tx + 46 * E, dy + ballant);
+      ctx.save();
+      ctx.translate(tx + 52 * E, cimeY + 42 * E + Math.sin(t0 * 1.3) * 8 * E);
       GRIMPEURS[monte](ctx, E, "rgba(" + accent().map(Math.round) + ",.95)", t0);
       ctx.restore();
     }
 
-    // ---- aurore boréale sur les dernières secondes ----
+    // ---- aurore boréale ----
     if (etage === "espace"){
       ctx.globalCompositeOperation = "lighter";
       for (let i = 0; i < 3; i++){
@@ -1530,21 +1596,17 @@
         ag.addColorStop(1, "hsla(" + hue + ",90%,62%,0)");
         ctx.fillStyle = ag;
         ctx.beginPath();
-        for (let x = 0; x <= W; x += 26 * E){
-          const on = Math.sin(x * .004 + t0 * .6 + i * 2) * 60 * E
-                   + Math.sin(x * .011 + t0 * .9) * 26 * E;
-          ctx.lineTo(x, Hh * .12 + on);
-        }
-        for (let x = W; x >= 0; x -= 26 * E){
-          const on = Math.sin(x * .004 + t0 * .6 + i * 2) * 60 * E;
-          ctx.lineTo(x, Hh * .58 + on);
-        }
+        for (let x = 0; x <= W; x += 26 * E)
+          ctx.lineTo(x, Hh * .12 + Math.sin(x * .004 + t0 * .6 + i * 2) * 60 * E
+                                 + Math.sin(x * .011 + t0 * .9) * 26 * E);
+        for (let x = W; x >= 0; x -= 26 * E)
+          ctx.lineTo(x, Hh * .58 + Math.sin(x * .004 + t0 * .6 + i * 2) * 60 * E);
         ctx.closePath(); ctx.fill();
       }
       ctx.globalCompositeOperation = "source-over";
     }
 
-    // ---- la floraison : le climax ----
+    // ---- la floraison ----
     if (libre){
       if (petales.length < 160 && Math.random() < .6)
         petales.push({ x: Math.random() * W, y: -20 * E,
@@ -1569,12 +1631,19 @@
       ctx.globalCompositeOperation = "source-over";
     } else if (petales.length) petales.length = 0;
 
-    // voile central : garantit la lisibilité du compteur sur un ciel clair
+    // voile central, pour que le compteur reste lisible sur un ciel clair
     const vg = ctx.createRadialGradient(W * .5, Hh * .42, 0, W * .5, Hh * .42,
                                         Math.max(W, Hh) * .55);
-    vg.addColorStop(0, "rgba(6,14,26," + (.30 - nuit * .18) + ")");
+    vg.addColorStop(0, "rgba(6,14,26," + (.26 - nuit * .16) + ")");
     vg.addColorStop(1, "rgba(6,14,26,0)");
     ctx.fillStyle = vg; ctx.fillRect(0, 0, W, Hh);
+
+    // vignettage doux, comme dans les abysses : referme la composition
+    const vig = ctx.createRadialGradient(W * .5, Hh * .5, Math.min(W, Hh) * .34,
+                                         W * .5, Hh * .5, Math.max(W, Hh) * .8);
+    vig.addColorStop(0, "rgba(0,6,12,0)");
+    vig.addColorStop(1, "rgba(0,6,12," + (.20 + nuit * .28) + ")");
+    ctx.fillStyle = vig; ctx.fillRect(0, 0, W, Hh);
   }
   /* ===================================================== */
 
