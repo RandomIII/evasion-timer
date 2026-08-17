@@ -1308,6 +1308,18 @@
     Coelacanth:           { t:1.50, v:.45, nage:"planeur" }
   };
   const profil = cle => PROFILS[cle] || { t:1, v:1, nage:"ondule" };
+  /* Créatures bioluminescentes : elles ÉMETTENT de la lumière, donc leur halo
+     échappe au fondu bleu (qui simule la lumière absorbée par l'eau) et ne se
+     révèle que dans le noir. Chaque espèce rayonne de sa propre couleur.
+       t = couleur   r = rayon (× la taille)   i = intensité   v = vitesse de pulsation */
+  const LUEURS = {
+    Football_Fish:        { t:"255,238,160", r:1.55, i:.95, v:2.6 },  // le leurre
+    Gold_Football_Fish:   { t:"255,206,74",  r:2.10, i:1.4, v:2.2 },
+    Blue_Moon_Jellyfish:  { t:"90,158,255",  r:1.45, i:.55, v:1.2 },
+    Green_Moon_Jellyfish: { t:"104,255,176", r:1.45, i:.55, v:1.2 },
+    Diamond_Jellyfish:    { t:"206,244,255", r:1.90, i:.95, v:1.6 },
+    Barreleye:            { t:"150,255,214", r:1.05, i:.35, v:1.9 }
+  };
   const P_RARE = .01;
   const tirage = cle => (RARETES[cle] && Math.random() < P_RARE) ? RARETES[cle] : cle;
   // les géants, qui traversent seuls : le requin scintillant est la pièce de collection
@@ -2179,6 +2191,25 @@
         s.x += s.v * s.dir * lent * allure;
         s.y += monteeY * dpr * lent;
         if (s.dir > 0 ? s.x > W + 110 * dpr : s.x < -110 * dpr) Object.assign(s, seedNageur(zone));
+        // halo bioluminescent, dessiné AVANT et hors du fondu bleu : c'est de la
+        // lumière émise, pas reflétée. Invisible en eau claire, franc dans le noir.
+        const lu = LUEURS[s.em];
+        if (lu){
+          const force = lu.i * (.18 + (1 - clarte) * .82)
+                      * (.55 + Math.sin(t0 * lu.v + s.ph) * .45) * (.5 + s.op * .5);
+          if (force > .02){
+            const R = s.t * 3.2 * lu.r;
+            const hg = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, R);
+            hg.addColorStop(0,  "rgba(" + lu.t + "," + (force * .55) + ")");
+            hg.addColorStop(.45,"rgba(" + lu.t + "," + (force * .18) + ")");
+            hg.addColorStop(1,  "rgba(" + lu.t + ",0)");
+            ctx.globalCompositeOperation = "lighter";
+            ctx.fillStyle = hg;
+            ctx.beginPath(); ctx.arc(s.x, s.y, R, 0, 6.283); ctx.fill();
+            ctx.globalCompositeOperation = "source-over";
+          }
+        }
+
         ctx.save(); ctx.translate(s.x, s.y);
         // quasi opaque : c'est le fondu vers la couleur de l'eau qui porte la distance
         ctx.globalAlpha = .82 + s.op * .18;
