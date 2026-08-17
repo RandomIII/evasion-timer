@@ -1321,6 +1321,377 @@
                      ph: Math.random() * 6.3, t: Math.random() * 5 + 6 });
   }
 
+  /* ---- assets de l'arbre : tronc, feuillage, couronne ---- */
+function dessineTronc(c, E, tx, cimeY, basY, t, nuit) {
+  const n = Math.min(1, Math.max(0, nuit || 0));
+  const hauteur = Math.max(basY - cimeY, 1);
+  const DEMI_CIME = 7 * E, DEMI_BAS = 190 * E, PAS = 22;
+  const eclat = 1 - 0.45 * n;
+
+  // La nuit tire les teintes vers un bleu sombre et non vers le noir pur :
+  // la silhouette doit rester lisible au clair de lune.
+  function teinte(hex, a) {
+    const k = 0.62 * n;
+    const r = Math.round(parseInt(hex.slice(1, 3), 16) * (1 - k) + 24 * k);
+    const g = Math.round(parseInt(hex.slice(3, 5), 16) * (1 - k) + 34 * k);
+    const b = Math.round(parseInt(hex.slice(5, 7), 16) * (1 - k) + 54 * k);
+    return a === undefined ? 'rgb(' + r + ',' + g + ',' + b + ')'
+                           : 'rgba(' + r + ',' + g + ',' + b + ',' + a + ')';
+  }
+  const OMBRE = '#2A1C12', BASE = '#4A3120', MEDIUM = '#6B4A2E',
+        CLAIR = '#8C6440', LUMIERE = '#A87A4E';
+  const cOmbre = teinte(OMBRE), cBase = teinte(BASE), cMedium = teinte(MEDIUM);
+  const bandeOmbre = teinte(OMBRE, 0.45), bandeDemi = teinte(BASE, 0.5),
+        bandeClair = teinte(CLAIR, 0.55 * eclat), bandeLum = teinte(LUMIERE, 0.5 * eclat),
+        sillonSombre = teinte(OMBRE, 0.2), sillonClair = teinte(LUMIERE, 0.12 * eclat),
+        colJonction = teinte(OMBRE, 0.09),
+        lisereD = teinte(LUMIERE, 0.55 * eclat), lisereG = teinte(CLAIR, 0.2 * eclat),
+        bordG = teinte(OMBRE, 0.4), bordD = teinte(LUMIERE, 0.4 * eclat);
+
+  // Pseudo-aléa déterministe : l'arbre est identique d'une frame à l'autre.
+  function alea(i) { const s = Math.sin(i * 12.9898 + 78.233) * 43758.5453; return s - Math.floor(s); }
+
+  const AMPL = 0.02 * DEMI_BAS;
+  const balance = Math.sin(t * 0.29) * 0.72 + Math.sin(t * 0.131 + 1.1) * 0.28;
+
+  function prof(y) { return Math.min(1, Math.max(0, (y - cimeY) / hauteur)); }
+  function demi(y) { return DEMI_CIME + (DEMI_BAS - DEMI_CIME) * Math.pow(prof(y), 1.45); }
+  function axe(y) {
+    const p = prof(y);
+    const serpent = Math.sin(p * 4.3) * 26 * E * (1 - 0.55 * p)
+                  + Math.sin(p * 9.4) * 8.5 * E * (1 - 0.4 * p);
+    // Le pied est ancré au sol : l'oscillation croît vers la cime.
+    return tx + serpent + balance * AMPL * (1 - p) * (1 - p);
+  }
+
+  const ys = [], ax = [], dm = [];
+  for (let i = 0; i <= PAS; i++) {
+    const y = cimeY + hauteur * (i / PAS);
+    ys.push(y); ax.push(axe(y)); dm.push(demi(y));
+  }
+
+  function traceCourbe(pts, depart) {
+    if (depart) c.moveTo(pts[0][0], pts[0][1]); else c.lineTo(pts[0][0], pts[0][1]);
+    for (let i = 1; i < pts.length - 1; i++) {
+      c.quadraticCurveTo(pts[i][0], pts[i][1],
+        (pts[i][0] + pts[i + 1][0]) / 2, (pts[i][1] + pts[i + 1][1]) / 2);
+    }
+    const f = pts[pts.length - 1];
+    c.lineTo(f[0], f[1]);
+  }
+
+  // Bande verticale entre deux offsets normalisés (-1 bord gauche, +1 bord droit) :
+  // elle suit l'élargissement du tronc sans réglage supplémentaire.
+  function bande(u0, u1, ondul, graine) {
+    const a = [], b = [];
+    for (let i = 0; i <= PAS; i++) {
+      const p = i / PAS;
+      const w = ondul ? Math.sin(p * (4.7 + graine * 2.6) + graine * 5.7) * ondul
+                      + Math.sin(p * 12.3 + graine * 3.1) * ondul * 0.45 : 0;
+      a.push([ax[i] + (u0 + w) * dm[i], ys[i]]);
+      b.push([ax[i] + (u1 + w) * dm[i], ys[i]]);
+    }
+    b.reverse();
+    c.beginPath(); traceCourbe(a, true); traceCourbe(b, false); c.closePath();
+  }
+
+  function limbe(x0, y0, cxp, cyp, x1, y1, w0, w1, couleur, lisere) {
+    const N = 8, haut = [], bas = [];
+    for (let i = 0; i <= N; i++) {
+      const s = i / N, u = 1 - s;
+      const px = u * u * x0 + 2 * u * s * cxp + s * s * x1;
+      const py = u * u * y0 + 2 * u * s * cyp + s * s * y1;
+      const dx = u * (cxp - x0) + s * (x1 - cxp), dy = u * (cyp - y0) + s * (y1 - cyp);
+      const l = Math.hypot(dx, dy) || 1;
+      let nx = -dy / l, ny = dx / l;
+      if (ny > 0) { nx = -nx; ny = -ny; }
+      const w = w0 + (w1 - w0) * Math.pow(s, 0.7);
+      haut.push([px + nx * w, py + ny * w]);
+      bas.push([px - nx * w, py - ny * w]);
+    }
+    bas.reverse();
+    c.beginPath(); traceCourbe(haut, true); traceCourbe(bas, false); c.closePath();
+    c.fillStyle = couleur; c.fill();
+    c.beginPath(); traceCourbe(haut, true);
+    c.strokeStyle = lisere; c.lineWidth = Math.max(1, w0 * 0.3); c.stroke();
+  }
+
+  const ancres = [{ x: ax[0], y: cimeY - 6 * E, taille: 62 * E, cote: 0 }];
+  const jonctions = [];
+
+  c.save();
+  c.lineJoin = 'round';
+  c.lineCap = 'round';
+
+  // Racines et branches passent avant le tronc : leur naissance est
+  // recouverte par le corps, la jonction reste propre.
+  // Pas de racines ici : le pied du tronc est masqué par le sol, qui dessine
+  // lui-même les siennes. En tracer deux jeux les faisait se croiser en planches.
+
+  const NB = Math.max(4, Math.min(12, Math.round(hauteur / (150 * E))));
+  for (let i = 0; i < NB; i++) {
+    const q = NB > 1 ? i / (NB - 1) : 0.5;
+    const p = 0.09 + 0.85 * q + (alea(i + 5) - 0.5) * 0.05;
+    const y0 = cimeY + hauteur * p, a0 = axe(y0), d0 = demi(y0);
+    const cote = i % 2 ? -1 : 1;
+    const w0 = (4.5 + 40 * Math.pow(p, 1.3)) * E;
+    const lg = (55 + 340 * Math.pow(p, 1.1)) * E * (0.82 + 0.34 * alea(i + 13));
+    const monte = 0.5 + 0.4 * alea(i + 19);
+    // Le bout de branche dérive un peu plus que le tronc, phase propre.
+    const flot = Math.sin(t * 0.37 + i * 1.9) * 2.2 * E;
+    const bx = a0 + cote * d0 * 0.5, by = y0;
+    const ex = bx + cote * lg + flot, ey = by - lg * monte + flot * 0.5;
+    const mcx = (bx + ex) / 2, mcy = (by + ey) / 2 + lg * 0.13;
+    limbe(bx, by, mcx, mcy, ex, ey, w0, w0 * 0.22,
+          cote > 0 ? cMedium : cBase, cote > 0 ? lisereD : lisereG);
+    ancres.push({ x: ex, y: ey, taille: Math.max(24 * E, w0 * 4.6), cote: cote });
+    jonctions.push([bx, by, w0]);
+
+    if (w0 > 8 * E) {
+      const s = 0.55 + 0.15 * alea(i + 23), u = 1 - s;
+      const jx = u * u * bx + 2 * u * s * mcx + s * s * ex;
+      const jy = u * u * by + 2 * u * s * mcy + s * s * ey;
+      const l2 = lg * (0.40 + 0.16 * alea(i + 29));
+      const e2x = jx + cote * l2 * 0.5, e2y = jy - l2 * 0.92;
+      limbe(jx, jy, (jx + e2x) / 2 + cote * l2 * 0.08, (jy + e2y) / 2 + l2 * 0.06,
+            e2x, e2y, w0 * 0.4, w0 * 0.12,
+            cote > 0 ? cMedium : cBase, cote > 0 ? lisereD : lisereG);
+      ancres.push({ x: e2x, y: e2y, taille: Math.max(18 * E, w0 * 3), cote: cote });
+    }
+    if (w0 > 20 * E) {
+      const s = 0.8, u = 1 - s;
+      const jx = u * u * bx + 2 * u * s * mcx + s * s * ex;
+      const jy = u * u * by + 2 * u * s * mcy + s * s * ey;
+      const l3 = lg * 0.3;
+      const e3x = jx + cote * l3 * 1.05, e3y = jy - l3 * 0.4;
+      limbe(jx, jy, (jx + e3x) / 2, (jy + e3y) / 2 + l3 * 0.12, e3x, e3y,
+            w0 * 0.26, w0 * 0.08,
+            cote > 0 ? cMedium : cBase, cote > 0 ? lisereD : lisereG);
+      ancres.push({ x: e3x, y: e3y, taille: Math.max(16 * E, w0 * 2.2), cote: cote });
+    }
+  }
+
+  const droite = [], gauche = [];
+  for (let i = 0; i <= PAS; i++) {
+    droite.push([ax[i] + dm[i], ys[i]]);
+    gauche.push([ax[i] - dm[i], ys[i]]);
+  }
+  const gaucheInv = gauche.slice().reverse();
+  function silhouette() {
+    c.beginPath();
+    traceCourbe(droite, true);
+    traceCourbe(gaucheInv, false);
+    c.quadraticCurveTo(ax[0], cimeY - 9 * E, droite[0][0], droite[0][1]);
+    c.closePath();
+  }
+
+  const grad = c.createLinearGradient(0, cimeY, 0, basY);
+  grad.addColorStop(0, cMedium);
+  grad.addColorStop(0.82, cBase);
+  grad.addColorStop(1, cOmbre);
+  silhouette();
+  c.fillStyle = grad;
+  c.fill();
+
+  c.save();
+  silhouette();
+  c.clip();
+
+  bande(-1.04, -0.52, 0, 0); c.fillStyle = bandeOmbre; c.fill();
+  bande(-0.52, -0.18, 0, 0); c.fillStyle = bandeDemi; c.fill();
+  bande(0.26, 0.78, 0, 0); c.fillStyle = bandeClair; c.fill();
+  bande(0.78, 1.04, 0, 0); c.fillStyle = bandeLum; c.fill();
+
+  // Rainures : le sliver clair est à gauche du creux, car la paroi qui
+  // regarde la source (haut-droite) est celle-là.
+  for (let i = 0; i < 8; i++) {
+    const u = -0.80 + 1.62 * (i / 7) + (alea(i + 61) - 0.5) * 0.09;
+    const e = 0.028 + 0.022 * alea(i + 67);
+    bande(u - e, u + e, 0.055, i + 1); c.fillStyle = sillonSombre; c.fill();
+    bande(u - e * 2.9, u - e * 1.1, 0.055, i + 1); c.fillStyle = sillonClair; c.fill();
+  }
+
+  c.fillStyle = colJonction;
+  for (let i = 0; i < jonctions.length; i++) {
+    const j = jonctions[i];
+    c.beginPath(); c.ellipse(j[0], j[1], j[2] * 2.1, j[2] * 1.3, 0, 0, 6.2832); c.fill();
+    c.beginPath(); c.ellipse(j[0], j[1], j[2] * 1.2, j[2] * 0.8, 0, 0, 6.2832); c.fill();
+  }
+
+  // Arêtes tracées sous le clip : seule la moitié intérieure subsiste,
+  // le contour reste net sans déborder de la silhouette.
+  c.beginPath(); traceCourbe(gauche, true);
+  c.strokeStyle = bordG; c.lineWidth = 6 * E; c.stroke();
+  c.beginPath(); traceCourbe(droite, true);
+  c.strokeStyle = bordD; c.lineWidth = 5 * E; c.stroke();
+
+  c.restore();
+  c.restore();
+
+  return ancres;
+}
+
+function dessineFeuillage(c, E, x, y, taille, graine, t, nuit) {
+  const R = taille * E;
+  if (!(R > 0.5)) return;
+
+  const TAU = Math.PI * 2;
+  const g = graine * 0.7301 + 1.318;
+
+  // silhouette figée d'une frame à l'autre : tout l'aléa dérive de la graine
+  const rnd = (i) => {
+    const s = Math.sin(g * 127.1 + i * 311.7) * 43758.5453;
+    return s - Math.floor(s);
+  };
+
+  const HEX = [0x163a20, 0x1e4a28, 0x2f6b36, 0x4c9147, 0x7fbf5c, 0xa8d97a];
+  const k = nuit * 0.62;
+  const P = new Array(6);
+  for (let i = 0; i < 6; i++) {
+    const v = HEX[i];
+    P[i] = 'rgb(' +
+      ((((v >> 16) & 255) * (1 - k) + 13 * k) | 0) + ',' +
+      ((((v >> 8) & 255) * (1 - k) + 29 * k) | 0) + ',' +
+      (((v & 255) * (1 - k) + 45 * k) | 0) + ')';
+  }
+
+  // projection sur l'axe de lumière haut-droite : +1 éclairé, -1 à l'ombre
+  const ton = (a) => {
+    const l = (Math.cos(a) - Math.sin(a)) * 0.7071;
+    return l > 0.45 ? 4 : l > -0.05 ? 3 : l > -0.6 ? 2 : 1;
+  };
+
+  const ph = graine * 2.3999;
+  const ox = Math.sin(t * 0.83 + ph) * R * 0.02;
+  const oy = Math.cos(t * 0.61 + ph * 1.7) * R * 0.012;
+  const resp = 1 + Math.sin(t * 0.47 + ph) * 0.008;
+  const rot = rnd(0) * TAU;
+
+  c.save();
+
+  const masse = (cx, cy, r, n, sem, ap, fill) => {
+    c.beginPath();
+    for (let i = 0; i <= n; i++) {
+      const j = i % n;
+      const a = (j / n) * TAU + rot;
+      const pointe = rnd(sem + j * 0.53) > 0.8 ? 0.17 : 0;
+      const rr = r * (0.8 + 0.3 * rnd(sem + j * 1.7) + pointe);
+      const qx = cx + Math.cos(a) * rr;
+      const qy = cy + Math.sin(a) * rr * ap;
+      if (i === 0) {
+        c.moveTo(qx, qy);
+        continue;
+      }
+      // point de contrôle repoussé vers l'extérieur : chaque segment devient un feston
+      const am = ((i - 0.5) / n) * TAU + rot;
+      const rm = r * (1.02 + 0.22 * rnd(sem + i * 3.13));
+      c.quadraticCurveTo(cx + Math.cos(am) * rm, cy + Math.sin(am) * rm * ap, qx, qy);
+    }
+    c.closePath();
+    c.fillStyle = fill;
+    c.fill();
+  };
+
+  const L = [
+    [-0.11, 0.13, 1.00, 0, 14, 0.90, 11],
+    [-0.06, 0.05, 0.93, 1, 13, 0.92, 29],
+    [0.02, -0.03, 0.84, 2, 12, 0.94, 47],
+    [0.11, -0.12, 0.69, 3, 11, 0.95, 67],
+    [0.19, -0.20, 0.49, 4, 10, 0.96, 83],
+    [0.27, -0.27, 0.28, 5, 9, 0.97, 101]
+  ];
+
+  const couche = (i) => {
+    const m = L[i];
+    const jx = (rnd(m[6]) - 0.5) * 0.1;
+    const jy = (rnd(m[6] + 5) - 0.5) * 0.1;
+    masse(x + ox + (m[0] + jx) * R, y + oy + (m[1] + jy) * R, m[2] * R * resp, m[4], m[6], m[5], P[m[3]]);
+  };
+
+  const touffes = (a0, span, n, sem) => {
+    for (let i = 0; i < n; i++) {
+      const a = a0 + span * ((i + rnd(sem + i)) / n);
+      const d = 0.78 + 0.2 * rnd(sem + i + 40);
+      const r = R * (0.15 + 0.11 * rnd(sem + i + 70));
+      masse(x + ox + Math.cos(a) * R * d, y + oy + Math.sin(a) * R * d * 0.88, r, 8, sem + i * 9, 0.95, P[ton(a)]);
+    }
+  };
+
+  const feuille = (a, dist, len, fill, tilt) => {
+    c.save();
+    c.translate(x + ox + Math.cos(a) * R * dist, y + oy + Math.sin(a) * R * dist * 0.9);
+    c.rotate(a + tilt);
+    c.beginPath();
+    c.moveTo(-len * 0.55, 0);
+    c.quadraticCurveTo(0, -len * 0.34, len * 0.55, 0);
+    c.quadraticCurveTo(0, len * 0.34, -len * 0.55, 0);
+    c.closePath();
+    c.fillStyle = fill;
+    c.fill();
+    c.restore();
+  };
+
+  couche(0);
+  couche(1);
+  touffes(Math.PI * 0.5, Math.PI * 0.55, 3, 140);
+  couche(2);
+  couche(3);
+  touffes(-Math.PI * 0.48, Math.PI * 0.44, 2, 175);
+  couche(4);
+  couche(5);
+
+  const nf = 7;
+  for (let i = 0; i < nf; i++) {
+    const a = (i / nf) * TAU + rnd(300 + i) * 0.6 + rot;
+    const d = 0.92 + 0.22 * rnd(320 + i);
+    const len = R * (0.17 + 0.1 * rnd(340 + i));
+    const tilt = Math.sin(t * 1.1 + i * 1.7 + ph) * 0.1;
+    feuille(a, d, len, P[ton(a)], tilt);
+  }
+
+  c.restore();
+}
+
+function dessineCouronne(c, E, tx, cimeY, taille, t, nuit) {
+  const R = taille * E;
+  if (!(R > 0.5)) return;
+
+  // même essence que les bouquets : la couronne n'est qu'un empilement plus dense,
+  // ordonné du côté ombre (bas-gauche) vers le côté éclairé (haut-droite)
+  const M = [
+    [0.00, -0.16, 1.00, 3.1],
+    [-0.74, 0.20, 0.52, 8.7],
+    [-0.42, 0.46, 0.40, 14.3],
+    [0.20, 0.50, 0.38, 19.9],
+    [0.72, 0.24, 0.48, 25.5],
+    [-0.58, -0.40, 0.50, 31.1],
+    [-0.16, -0.86, 0.52, 36.7],
+    [0.46, -0.52, 0.58, 42.3],
+    [0.24, -1.04, 0.38, 47.9],
+    [0.64, -0.84, 0.28, 53.5]
+  ];
+
+  const k = nuit * 0.62;
+  const om = 'rgba(' +
+    ((22 * (1 - k) + 13 * k) | 0) + ',' +
+    ((58 * (1 - k) + 29 * k) | 0) + ',' +
+    ((32 * (1 - k) + 45 * k) | 0) + ',0.34)';
+
+  c.save();
+  for (let i = 0; i < M.length; i++) {
+    const m = M[i];
+    dessineFeuillage(c, E, tx + m[0] * R, cimeY + m[1] * R, taille * m[2], m[3], t, nuit);
+    if (i === 4) {
+      // creux d'ombre à l'entrée du tronc, posé avant les masses du dessus qui le recouvrent
+      c.beginPath();
+      c.ellipse(tx - R * 0.06, cimeY + R * 0.3, R * 0.6, R * 0.26, 0, 0, Math.PI * 2);
+      c.fillStyle = om;
+      c.fill();
+    }
+  }
+  c.restore();
+}
+
   /* nuage : amas de bouffées à bord fondu. Le sprite est calculé une fois — des
      ellipses pleines donnaient des galets gris, il faut un dégradé pour du coton. */
   let bouffee = null;
@@ -1446,63 +1817,20 @@
       ctx.globalCompositeOperation = "source-over";
     }
 
-    // ---- le tronc, qui plonge sous la cime ----
+    // ---- le tronc, ses branches et son feuillage ----
     const tx = W * .17;
-    const largeur = y => (7 + Math.max(0, y - cimeY) / Math.max(1, SPAN) * 190) * E;
     {
-      const gt = ctx.createLinearGradient(tx - 46 * E, 0, tx + 46 * E, 0);
-      gt.addColorStop(0,  "rgb(38,26,17)");
-      gt.addColorStop(.42,"rgb(112,80,50)");
-      gt.addColorStop(.72,"rgb(86,60,38)");
-      gt.addColorStop(1,  "rgb(32,22,15)");
-      ctx.fillStyle = gt;
-      const y1 = Math.min(solY, Hh + 60 * E);
-      ctx.beginPath();
-      for (let y = cimeY; y <= y1; y += 12 * E)
-        ctx.lineTo(tx - largeur(y) + Math.sin(y * .009) * 8 * E, y);
-      for (let y = y1; y >= cimeY; y -= 12 * E)
-        ctx.lineTo(tx + largeur(y) + Math.sin(y * .009) * 8 * E, y);
-      ctx.closePath(); ctx.fill();
-
-      if (aDebloque("algues")){                      // branches, plus amples vers le bas
-        for (let k = 0; k < 10; k++){
-          const by = cimeY + (k + .5) / 10 * (y1 - cimeY);
-          const cote = k % 2 ? 1 : -1;
-          const lb = (26 + largeur(by) * 2.4) * 1;
-          const bx = tx + Math.sin(by * .009) * 8 * E;
-          ctx.strokeStyle = "rgb(74,52,33)";
-          ctx.lineWidth = Math.max(2 * E, largeur(by) * .26); ctx.lineCap = "round";
-          ctx.beginPath(); ctx.moveTo(bx, by);
-          ctx.quadraticCurveTo(bx + cote * lb * .6, by - lb * .34,
-                               bx + cote * lb, by - lb * .55);
-          ctx.stroke();
-          const fx = bx + cote * lb, fy = by - lb * .55;
-          const vert = mix([28, 78, 42], [128, 190, 100], .5 + Math.sin(k) * .2);
-          ctx.fillStyle = "rgba(" + vert + "," + (.9 - nuit * .55) + ")";
-          for (let j = 0; j < 5; j++){
-            const a = j * 1.257 + k;
-            ctx.beginPath();
-            ctx.ellipse(fx + Math.cos(a) * lb * .26 + Math.sin(t0 * .8 + k) * 3 * E,
-                        fy + Math.sin(a) * lb * .2,
-                        lb * .3, lb * .23, a, 0, 6.283);
-            ctx.fill();
-          }
-        }
-      }
-      // la cime : bouquet terminal, toujours à l'écran puisqu'on la suit
+      const bas = Math.min(solY, Hh + 260 * E);
+      const ancres = dessineTronc(ctx, E, tx, cimeY, bas, t0, nuit);
       if (aDebloque("algues")){
-        const vert = mix([32, 88, 46], [138, 200, 108], .55);
-        ctx.fillStyle = "rgba(" + vert + "," + (.95 - nuit * .5) + ")";
-        for (let j = 0; j < 7; j++){
-          const a = j * .897;
-          ctx.beginPath();
-          ctx.ellipse(tx + Math.cos(a) * 26 * E + Math.sin(t0 * .7 + j) * 3 * E,
-                      cimeY - 12 * E + Math.sin(a) * 16 * E,
-                      22 * E, 16 * E, a, 0, 6.283);
-          ctx.fill();
-        }
+        for (const an of ancres)
+          if (an.cote !== 0)
+            dessineFeuillage(ctx, E, an.x, an.y, an.taille / E * .62,
+                             an.x * .07 + an.y * .013, t0, nuit);
+        dessineCouronne(ctx, E, tx, cimeY, 54, t0, nuit);
       }
     }
+
 
     // ---- le sol, visible au début de la journée ----
     if (solY < Hh + 80 * E){
