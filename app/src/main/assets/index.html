@@ -488,12 +488,12 @@
     background:rgba(3,20,32,.66);border-color:#1C5B78;
   }
   /* paliers = remontée vers la lumière, pas escalade du danger */
-  body.monde-abysses.jaune {--glow:#2FA6E0;--magenta:#7FD0F5;}
-  body.monde-abysses.orange{--glow:#3F72DC;--magenta:#8FAEF2;}
-  body.monde-abysses.rouge {--glow:#6B54E4;--magenta:#A99AF5;}
-  body.monde-abysses.violet{--glow:#3BF0A8;--magenta:#9BFAD6;}
-  /* dernières secondes dans la fosse : bioluminescence crue, sans arc-en-ciel ni secousse */
-  body.monde-abysses.arc{--glow:#8FFFE4;--magenta:#C8FFF2;}
+  body.monde-abysses.jaune {--glow:#46D2F2;--magenta:#8FE2F8;}
+  body.monde-abysses.orange{--glow:#5CCDF8;--magenta:#9FE4FA;}
+  body.monde-abysses.rouge {--glow:#7CD4FC;--magenta:#B4E9FD;}
+  body.monde-abysses.violet{--glow:#A2E2FF;--magenta:#CDF1FF;}
+  /* dernières secondes dans la fosse : l'afficheur est la seule lumière restante */
+  body.monde-abysses.arc{--glow:#D6F4FF;--magenta:#EAFAFF;}
   body.monde-abysses .libre{color:#EAFBFF;text-shadow:0 0 60px #7FE9F5;}
   /* l'eau claire délave le texte : on le rehausse */
   body.monde-abysses .eyebrow{color:#BFE8F5;text-shadow:0 2px 10px rgba(0,20,34,.9);}
@@ -771,10 +771,10 @@
       // On démarre avec un simple fond marin ensoleillé ; tout le reste s'achète,
       // y compris le plongeur et les profondeurs qui allongent la remontée.
       nom: "Abysses", icone: "🌊", monnaie: "🫧",
-      // on s'enfonce : le turquoise de surface glisse vers le bleu profond,
-      // puis vers la bioluminescence, seule lumière du fond
-      paliers: { base:"#35D6E8", jaune:"#2FA6E0", orange:"#3F72DC",
-                 rouge:"#6B54E4", violet:"#3BF0A8" },
+      // On reste dans le bleu du début à la fin : l'afficheur s'éclaircit
+      // à mesure que l'eau s'assombrit, comme un écran qui monte sa luminosité.
+      paliers: { base:"#35D6E8", jaune:"#46D2F2", orange:"#5CCDF8",
+                 rouge:"#7CD4FC", violet:"#A2E2FF" },
       competences: [
         { id:"start",  nom:"Fond marin",           cout:0,   pre:null,     row:1, col:3 },
 
