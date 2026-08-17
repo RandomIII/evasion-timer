@@ -371,8 +371,12 @@
 
   /* ---------- instruments de plongée (RP : l'écran est le masque) ---------- */
   .depthRule,.pressGauge,.visorCrack{display:none;}
-  body.monde-abysses:not(.lock-prof)  .depthRule{display:block;}
-  body.monde-abysses:not(.lock-press) .pressGauge{display:block;}
+  body.monde-abysses:not(.lock-prof)  .depthRule,
+  body.monde-arbre:not(.lock-prof)    .depthRule{display:block;}
+  body.monde-abysses:not(.lock-press) .pressGauge,
+  body.monde-arbre:not(.lock-press)   .pressGauge{display:block;}
+  /* on monte : l'échelle de l'altimètre se lit de bas en haut */
+  body.monde-arbre .dr-cursor::after{border-left-color:var(--glow);}
 
   /* règle de profondeur, à droite */
   .depthRule{
@@ -480,7 +484,7 @@
   }
 
   /* ---------- thème du monde des abysses ---------- */
-  body.monde-abysses{--void:#02121C;--ink:#E8F7FF;--dim:#5E8598;}
+  body.monde-abysses{--void:#02121C;--ink:#E8F7FF;--dim:#5E8598;--glow:#35D6E8;}
   body.monde-abysses .cell{background:rgba(3,20,32,.72);}
   body.monde-abysses .telemetry{background:#16455C;border-color:#16455C;}
   body.monde-abysses .track{background:rgba(3,20,32,.6);border-color:#1C5B78;}
@@ -498,6 +502,24 @@
   /* l'eau claire délave le texte : on le rehausse */
   body.monde-abysses .eyebrow{color:#BFE8F5;text-shadow:0 2px 10px rgba(0,20,34,.9);}
   body.monde-abysses .cap,body.monde-abysses .ticks{color:#AEDDEC;text-shadow:0 1px 8px rgba(0,20,34,.85);}
+
+  /* ---------- thème du monde de l'Arbre ---------- */
+  body.monde-arbre{--void:#0B1410;--ink:#F0F6EC;--dim:#7C8F79;--glow:#8FE08A;}
+  body.monde-arbre .cell{background:rgba(10,22,16,.72);}
+  body.monde-arbre .telemetry,body.monde-arbre .day{display:none;}
+  body.monde-arbre .cell-fps{display:none;}
+  body.monde-arbre .menuBtn,body.monde-arbre .tokBtn,body.monde-arbre .worldBtn{
+    background:rgba(10,22,16,.66);border-color:#2C4A34;
+  }
+  body.monde-arbre .eyebrow{color:#CFE6C8;text-shadow:0 2px 10px rgba(4,16,10,.9);}
+  body.monde-arbre .cap{color:#BEDCB6;text-shadow:0 1px 8px rgba(4,16,10,.85);}
+  body.monde-arbre.jaune {--glow:#FFD45E;--magenta:#FFE9A6;}
+  body.monde-arbre.orange{--glow:#FF9B4F;--magenta:#FFC79A;}
+  body.monde-arbre.rouge {--glow:#E9739B;--magenta:#F7B2C8;}
+  body.monde-arbre.violet{--glow:#8E7BEA;--magenta:#C3B8F6;}
+  /* dans l'espace, l'aurore : le compteur passe au vert polaire */
+  body.monde-arbre.arc{--glow:#7CF0C0;--magenta:#BFFAE2;}
+  body.monde-arbre .libre{color:#FFE9F4;text-shadow:0 0 60px #FF9ECF;}
 
   /* ---------- arbre de compétences ---------- */
   .tree{
@@ -810,7 +832,47 @@
       ]
     }
   };
-  const ORDRE_MONDES = ["neon", "abysses"];       // ordre de déblocage par prestige
+  MONDES.arbre = {
+    // Une graine devient un arbre qui perce l'atmosphère. La caméra suit la cime :
+    // on s'élève toute la journée. Les paliers deviennent les couleurs du ciel.
+    nom: "L'Arbre", icone: "🌱", monnaie: "🌿",
+    paliers: { base:"#8FE08A", jaune:"#FFD45E", orange:"#FF9B4F",
+               rouge:"#E9739B", violet:"#8E7BEA" },
+    competences: [
+      { id:"start",  nom:"Une graine",           cout:0,   pre:null,     row:1, col:3 },
+
+      { id:"min",    nom:"Minutes",              cout:20,  pre:"start",  row:2, col:2 },
+      { id:"diver",  nom:"Le grimpeur",          cout:45,  pre:"start",  row:2, col:4 },
+
+      { id:"sec",    nom:"Secondes",             cout:55,  pre:"min",    row:3, col:1 },
+      { id:"rate1",  nom:"+1 🌿 / min",          cout:40,  pre:"min",    row:3, col:3 },
+      { id:"stats",  nom:"Journal de croissance",cout:15,  pre:"diver",  row:3, col:5 },
+
+      { id:"prof",   nom:"Altimètre",            cout:90,  pre:"sec",    row:4, col:1 },
+      { id:"bg",     nom:"Oiseaux",              cout:25,  pre:"rate1",  row:4, col:2 },
+      { id:"algues", nom:"Racines & feuillage",  cout:35,  pre:"rate1",  row:4, col:3 },
+      { id:"lunch",  nom:"Pause déjeuner",       cout:55,  pre:"stats",  row:4, col:4 },
+      { id:"wake",   nom:"Écran allumé",         cout:30,  pre:"stats",  row:4, col:5 },
+
+      { id:"press",  nom:"Baromètre (hPa)",      cout:170, pre:"prof",   row:5, col:1 },
+      { id:"tresor", nom:"Nid d'oiseau",         cout:80,  pre:"algues", row:5, col:3 },
+      { id:"son",    nom:"Chant des oiseaux",    cout:25,  pre:"lunch",  row:5, col:4 },
+      { id:"full",   nom:"Plein écran",          cout:20,  pre:"wake",   row:5, col:5 },
+
+      // les altitudes : chaque palier fait pousser l'arbre plus haut
+      { id:"jaune",  nom:"120 m · la canopée",   cout:60,  pre:"bg",     row:6, col:2 },
+      { id:"boat",   nom:"Montgolfière",         cout:120, pre:"tresor", row:6, col:3 },
+      { id:"pin",    nom:"Épingler au 1er plan", cout:450, pre:"full",   row:6, col:5 },
+
+      { id:"rate2",  nom:"+1 🌿 / min",          cout:300, pre:"press",  row:7, col:1 },
+      { id:"orange", nom:"800 m · les nuages",   cout:120, pre:"jaune",  row:7, col:2 },
+
+      { id:"rouge",  nom:"5 km · la stratosphère",cout:220, pre:"orange", row:8, col:2 },
+      { id:"violet", nom:"40 km · la mésosphère", cout:400, pre:"rouge",  row:9, col:2 },
+      { id:"arc",    nom:"L'ESPACE · 10 s",      cout:800, pre:"violet", row:10, col:2 }
+    ]
+  };
+  const ORDRE_MONDES = ["neon", "abysses", "arbre"];   // ordre de déblocage par prestige
   const TOUS_IDS = [...new Set(ORDRE_MONDES.flatMap(m => MONDES[m].competences.map(c => c.id)))];
 
   const CLE_JEU = "evasion.jeu";
@@ -1072,6 +1134,449 @@
     ctx.globalAlpha = 1;
     ctx.globalCompositeOperation = "source-over";
   }
+
+  /* ---- le grimpeur change de moyen d'ascension avec l'altitude ----
+     au sol un écureuil grimpe le tronc, dans la canopée il devient oiseau,
+     dans les nuages une montgolfière, au-delà une fusée. */
+  const GRIMPEURS = {
+    ecureuil(c, u, glow, t){
+      const k = Math.sin(t * 4.2);                    // bonds le long du tronc
+      c.save(); c.rotate(-.25 + k * .12);
+      c.fillStyle = "#8A5A34";                                              // queue touffue
+      c.beginPath();
+      c.moveTo(-8 * u, 2 * u);
+      c.quadraticCurveTo(-30 * u, -6 * u + k * 8 * u, -20 * u, -26 * u + k * 6 * u);
+      c.quadraticCurveTo(-12 * u, -14 * u, -6 * u, -2 * u);
+      c.closePath(); c.fill();
+      c.fillStyle = "#A96C3E";                                              // corps
+      c.beginPath(); c.ellipse(0, 0, 13 * u, 9 * u, 0, 0, 6.283); c.fill();
+      c.fillStyle = "#E7C79A";                                              // ventre
+      c.beginPath(); c.ellipse(1 * u, 4 * u, 9 * u, 5 * u, 0, 0, 6.283); c.fill();
+      c.strokeStyle = "#8A5A34"; c.lineWidth = 3 * u; c.lineCap = "round";   // pattes
+      c.beginPath(); c.moveTo(-3 * u, 7 * u); c.lineTo(-8 * u, 12 * u - k * 3 * u); c.stroke();
+      c.beginPath(); c.moveTo(7 * u, 6 * u); c.lineTo(12 * u, 11 * u + k * 3 * u); c.stroke();
+      c.fillStyle = "#A96C3E";                                              // tête
+      c.beginPath(); c.arc(12 * u, -4 * u, 7.5 * u, 0, 6.283); c.fill();
+      c.beginPath(); c.moveTo(9 * u, -10 * u); c.lineTo(11 * u, -17 * u);    // oreille
+      c.lineTo(14 * u, -10 * u); c.closePath(); c.fill();
+      c.fillStyle = "#2A1A10";
+      c.beginPath(); c.arc(16 * u, -5 * u, 1.8 * u, 0, 6.283); c.fill();     // œil
+      c.fillStyle = glow;                                                    // gland lumineux
+      c.beginPath(); c.arc(19 * u, 1 * u, 3.4 * u, 0, 6.283); c.fill();
+      c.restore();
+    },
+
+    oiseau(c, u, glow, t){
+      const bat = Math.sin(t * 6.5);
+      c.fillStyle = "#3E6FA8";                                              // corps
+      c.beginPath(); c.ellipse(0, 0, 15 * u, 8 * u, -.12, 0, 6.283); c.fill();
+      c.fillStyle = "#2C5182";                                              // aile arrière
+      c.beginPath(); c.moveTo(-2 * u, -2 * u);
+      c.quadraticCurveTo(-16 * u, -10 * u - bat * 16 * u, -26 * u, 2 * u - bat * 8 * u);
+      c.quadraticCurveTo(-12 * u, 4 * u, -2 * u, 2 * u); c.closePath(); c.fill();
+      c.fillStyle = "#4E85C4";                                              // aile avant
+      c.beginPath(); c.moveTo(0, -1 * u);
+      c.quadraticCurveTo(-6 * u, -12 * u + bat * 18 * u, 6 * u, -6 * u + bat * 12 * u);
+      c.quadraticCurveTo(6 * u, 1 * u, 0, 2 * u); c.closePath(); c.fill();
+      c.fillStyle = "#3E6FA8";
+      c.beginPath(); c.moveTo(-14 * u, 0);                                  // queue
+      c.lineTo(-24 * u, -5 * u); c.lineTo(-23 * u, 5 * u); c.closePath(); c.fill();
+      c.fillStyle = "#4E85C4";
+      c.beginPath(); c.arc(14 * u, -4 * u, 6.5 * u, 0, 6.283); c.fill();    // tête
+      c.fillStyle = "#F2B33D";
+      c.beginPath(); c.moveTo(19 * u, -4 * u); c.lineTo(27 * u, -2 * u);    // bec
+      c.lineTo(19 * u, 0); c.closePath(); c.fill();
+      c.fillStyle = "#12202E";
+      c.beginPath(); c.arc(16 * u, -6 * u, 1.7 * u, 0, 6.283); c.fill();
+      c.fillStyle = glow;                                                    // reflet dans l'œil
+      c.beginPath(); c.arc(16.6 * u, -6.6 * u, .7 * u, 0, 6.283); c.fill();
+    },
+
+    ballon(c, u, glow, t){
+      const bal = Math.sin(t * .9);
+      c.save(); c.rotate(bal * .07);
+      const g = c.createLinearGradient(-26 * u, 0, 26 * u, 0);              // enveloppe
+      g.addColorStop(0, "#C8413F"); g.addColorStop(.35, "#F3E6CC");
+      g.addColorStop(.65, "#E4A93A"); g.addColorStop(1, "#C8413F");
+      c.fillStyle = g;
+      c.beginPath(); c.ellipse(0, -6 * u, 26 * u, 32 * u, 0, Math.PI, 0); c.fill();
+      c.beginPath(); c.moveTo(-26 * u, -6 * u);
+      c.quadraticCurveTo(0, 30 * u, 26 * u, -6 * u); c.closePath(); c.fill();
+      c.strokeStyle = "rgba(52,36,24,.9)"; c.lineWidth = 1.5 * u;           // suspentes
+      c.beginPath(); c.moveTo(-10 * u, 22 * u); c.lineTo(-7 * u, 36 * u);
+      c.moveTo(10 * u, 22 * u); c.lineTo(7 * u, 36 * u); c.stroke();
+      c.fillStyle = "#8A5E34";                                              // nacelle
+      c.fillRect(-8 * u, 36 * u, 16 * u, 12 * u);
+      c.globalCompositeOperation = "lighter";                               // brûleur
+      const bg = c.createRadialGradient(0, 30 * u, 0, 0, 30 * u, 16 * u);
+      bg.addColorStop(0, "rgba(255,196,90," + (.35 + Math.sin(t * 5) * .25) + ")");
+      bg.addColorStop(1, "rgba(255,150,40,0)");
+      c.fillStyle = bg;
+      c.beginPath(); c.arc(0, 30 * u, 16 * u, 0, 6.283); c.fill();
+      c.globalCompositeOperation = "source-over";
+      c.restore();
+    },
+
+    fusee(c, u, glow, t){
+      c.save(); c.rotate(-1.57);                       // pointe vers le haut
+      c.globalCompositeOperation = "lighter";          // panache de flamme
+      for (let i = 0; i < 5; i++){
+        const m = ((t * 2.2 + i * .2) % 1);
+        c.fillStyle = "rgba(255," + (170 - i * 18) + ",70," + (.42 * (1 - m)) + ")";
+        c.beginPath();
+        c.arc(-26 * u - m * 46 * u, Math.sin(t * 14 + i) * 3 * u,
+              (7 + m * 15) * u, 0, 6.283);
+        c.fill();
+      }
+      c.globalCompositeOperation = "source-over";
+      c.fillStyle = "#D8DEE8";                                              // fuselage
+      c.beginPath(); c.moveTo(34 * u, 0);
+      c.quadraticCurveTo(16 * u, -10 * u, -22 * u, -9 * u);
+      c.lineTo(-22 * u, 9 * u);
+      c.quadraticCurveTo(16 * u, 10 * u, 34 * u, 0); c.closePath(); c.fill();
+      c.fillStyle = "#C8433C";                                              // coiffe
+      c.beginPath(); c.moveTo(34 * u, 0);
+      c.quadraticCurveTo(20 * u, -9 * u, 12 * u, -8 * u);
+      c.lineTo(12 * u, 8 * u);
+      c.quadraticCurveTo(20 * u, 9 * u, 34 * u, 0); c.closePath(); c.fill();
+      c.fillStyle = "#C8433C";                                              // ailerons
+      c.beginPath(); c.moveTo(-14 * u, -8 * u); c.lineTo(-26 * u, -22 * u);
+      c.lineTo(-22 * u, -8 * u); c.closePath(); c.fill();
+      c.beginPath(); c.moveTo(-14 * u, 8 * u); c.lineTo(-26 * u, 22 * u);
+      c.lineTo(-22 * u, 8 * u); c.closePath(); c.fill();
+      c.fillStyle = "#0E1A26";                                              // hublot
+      c.beginPath(); c.arc(6 * u, 0, 6 * u, 0, 6.283); c.fill();
+      c.fillStyle = glow;
+      c.beginPath(); c.arc(6 * u, 0, 4.2 * u, 0, 6.283); c.fill();
+      c.restore();
+    }
+  };
+
+  /* ================= MONDE 3 : l'Arbre =================
+     La journée est une ASCENSION : une graine germe le matin, l'arbre perce
+     l'atmosphère le soir. La caméra suit la cime, donc le tronc défile vers le
+     bas. Les paliers d'alerte deviennent les couleurs du ciel, et le grimpeur
+     change de moyen de transport à mesure qu'il monte. */
+  const ALTITUDES = [                    // palier acheté → altitude atteinte (m)
+    { id:"violet", m:40000 }, { id:"rouge", m:5000 },
+    { id:"orange", m:800 },   { id:"jaune", m:120 }
+  ];
+  const altMax = () => (ALTITUDES.find(z => aDebloque(z.id)) || { m:30 }).m;
+
+  // étages du ciel, calés sur les mêmes seuils que la LED : l'instrument et le
+  // décor racontent la même chose
+  const etageDe = s => s > 3600 ? "sol"          // + d'1 h : au ras de l'herbe
+                     : s > 1200 ? "canopee"      // 1 h    : plein ciel
+                     : s >  300 ? "nuages"       // 20 min : la couche nuageuse
+                     : s >   60 ? "strato"       // 5 min  : le bleu s'éteint
+                     :            "espace";      // 1 min  : le noir et les étoiles
+  const CIEL = {                          // haut et bas du dégradé, par étage
+    sol:     { h:[126, 202, 240], b:[196, 232, 216] },
+    canopee: { h:[86, 168, 226],  b:[214, 206, 160] },
+    nuages:  { h:[62, 118, 196],  b:[248, 176, 120] },
+    strato:  { h:[16, 30, 78],    b:[128, 76, 148] },
+    espace:  { h:[2, 3, 10],      b:[16, 18, 52]   }
+  };
+  const ANCRES_CIEL = [[14400, 0], [3600, 1], [1200, 2], [300, 3], [60, 4], [0, 4]];
+  // position continue dans les étages, pour que le ciel change sans à-coups
+  function etageFlot(s){
+    s = Math.max(0, s);
+    if (s >= 14400) return 0;
+    for (let i = 0; i < ANCRES_CIEL.length - 1; i++){
+      const [a, va] = ANCRES_CIEL[i], [b, vb] = ANCRES_CIEL[i + 1];
+      if (s <= a && s >= b) return vb + (va - vb) * (s - b) / (a - b);
+    }
+    return 4;
+  }
+  const ETAGES = ["sol", "canopee", "nuages", "strato", "espace"];
+  function couleurCiel(f, cle){
+    const i = Math.min(3, Math.floor(f)), t = f - i;
+    return mix(CIEL[ETAGES[i]][cle], CIEL[ETAGES[i + 1]][cle], t);
+  }
+
+  const etoiles = [], nuees = [], feuilles = [], oiseaux = [], petales = [];
+  let arbrePret = false, altM = 0;
+  function initArbre(){
+    if (arbrePret) return;
+    arbrePret = true;
+    for (let i = 0; i < 130; i++)
+      etoiles.push({ x: Math.random(), y: Math.random(), r: Math.random() * 1.4 + .4,
+                     ph: Math.random() * 6.3 });
+    for (let i = 0; i < 14; i++)
+      nuees.push({ x: Math.random(), y: Math.random(), l: Math.random() * .3 + .18,
+                   e: Math.random() * .5 + .5, v: Math.random() * .3 + .1,
+                   c: Math.random() });
+    for (let i = 0; i < 26; i++)
+      feuilles.push({ x: Math.random() * W, y: Math.random() * Hh,
+                      r: (Math.random() * 5 + 4), rot: Math.random() * 6.3,
+                      vr: (Math.random() - .5) * .05, v: Math.random() * .5 + .3,
+                      h: 92 + Math.random() * 46 });
+    for (let i = 0; i < 8; i++)
+      oiseaux.push({ x: Math.random() * W, y: Math.random() * Hh * .7,
+                     dir: Math.random() < .5 ? 1 : -1, v: Math.random() * 1.2 + .8,
+                     ph: Math.random() * 6.3, t: Math.random() * 5 + 6 });
+  }
+
+  function dessineArbre(prog, enPause, alerte, libre, secDep){
+    initArbre();
+    const p = Math.max(0, Math.min(1, prog));
+    const lent = reduce ? .35 : 1;
+    const AM = altMax();
+    altM = AM * p;                                   // on MONTE : 0 le matin, AM le soir
+    const t0 = performance.now() / 1000;
+    const fe = libre ? 4 : etageFlot(secDep);
+    const etage = libre ? "espace" : etageDe(secDep);
+    const nuit = Math.min(1, Math.max(0, (fe - 2.1) / 1.9));   // 0 = jour, 1 = espace
+    const E = ech() * dpr;
+
+    // le ciel
+    const g = ctx.createLinearGradient(0, 0, 0, Hh);
+    g.addColorStop(0, "rgb(" + couleurCiel(fe, "h") + ")");
+    g.addColorStop(1, "rgb(" + couleurCiel(fe, "b") + ")");
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, Hh);
+
+    // les étoiles se révèlent en s'élevant
+    if (nuit > .02){
+      for (const e of etoiles){
+        const a = nuit * (.35 + Math.sin(t0 * 1.4 + e.ph) * .3 + .35);
+        ctx.fillStyle = "rgba(255,252,238," + Math.max(0, a) + ")";
+        ctx.beginPath();
+        ctx.arc(e.x * W, e.y * Hh * .92, e.r * E, 0, 6.283); ctx.fill();
+      }
+    }
+
+    // le soleil descend et rougit à mesure qu'on s'élève
+    const sy = Hh * (.16 + fe * .1), sr = 46 * E;
+    ctx.globalCompositeOperation = "lighter";
+    const sg = ctx.createRadialGradient(W * .78, sy, 0, W * .78, sy, sr * 5);
+    const cs = mix([255, 246, 206], [255, 138, 96], Math.min(1, fe / 3));
+    sg.addColorStop(0, "rgba(" + cs + "," + (.5 - nuit * .42) + ")");
+    sg.addColorStop(1, "rgba(" + cs + ",0)");
+    ctx.fillStyle = sg; ctx.fillRect(0, 0, W, Hh);
+    ctx.globalCompositeOperation = "source-over";
+    if (nuit < .85){
+      ctx.fillStyle = "rgba(" + cs + "," + (.9 - nuit) + ")";
+      ctx.beginPath(); ctx.arc(W * .78, sy, sr, 0, 6.283); ctx.fill();
+    }
+
+    // ---- géométrie verticale : le grimpeur est fixe, le monde défile ----
+    const dy = Hh * .52, SPAN = Hh * 3;
+    const solY  = dy + p * SPAN;                     // le sol s'éloigne vers le bas
+    const cimeY = dy - (1 - p) * SPAN;               // la cime nous précède
+
+    // nuées, en parallaxe : elles descendent puisqu'on monte
+    for (const n of nuees){
+      const par = .3 + n.c * .7;
+      const y = (((n.y + p * 5 * par) % 1) + 1) % 1 * (Hh + 300 * E) - 150 * E;
+      const x = n.x * W + Math.sin(t0 * n.v * .2 + n.y * 9) * 40 * E;
+      const L = n.l * W, H2 = L * .22 * n.e;
+      // les nuages n'existent qu'à leur étage : absents au sol, disparus au-dessus
+      // de la troposphère. Sans cette borne ils flottaient encore à 40 km.
+      const bande = Math.max(0, Math.min(1, (fe - .3) / .9))
+                  * Math.max(0, Math.min(1, (3.15 - fe) / .7));
+      const op = (.55 + n.c * .4) * bande;
+      if (op <= .015) continue;
+      ctx.fillStyle = "rgba(255,252,248," + op + ")";
+      for (let k = 0; k < 5; k++){                   // amas de boules = nuage
+        const bx = x + (k - 2) * L * .19;
+        const br = H2 * (1 - Math.abs(k - 2) * .22);
+        ctx.beginPath(); ctx.ellipse(bx, y, br * 1.5, br, 0, 0, 6.283); ctx.fill();
+      }
+    }
+
+    // ---- le tronc, qui défile vers le bas ----
+    const tx = W * .17;
+    const largeur = y => (10 + (y - cimeY) / Math.max(1, solY - cimeY) * 44) * E;
+    if (solY > -60 * E && cimeY < Hh + 60 * E){
+      const gt = ctx.createLinearGradient(tx - 40 * E, 0, tx + 40 * E, 0);
+      gt.addColorStop(0,  "rgb(" + mix([44, 30, 20], [96, 68, 44], .35) + ")");
+      gt.addColorStop(.45,"rgb(" + mix([96, 68, 44], [148, 112, 72], .4) + ")");
+      gt.addColorStop(1,  "rgb(" + mix([34, 24, 16], [72, 50, 32], .3) + ")");
+      ctx.fillStyle = gt;
+      ctx.beginPath();
+      const y0 = Math.max(cimeY, -60 * E), y1 = Math.min(solY, Hh + 60 * E);
+      for (let y = y0; y <= y1; y += 14 * E)
+        ctx.lineTo(tx - largeur(y) + Math.sin(y * .012) * 7 * E, y);
+      for (let y = y1; y >= y0; y -= 14 * E)
+        ctx.lineTo(tx + largeur(y) + Math.sin(y * .012) * 7 * E, y);
+      ctx.closePath(); ctx.fill();
+
+      if (aDebloque("algues")){                      // branches et feuillage
+        for (let k = 0; k < 9; k++){
+          const by = y0 + ((k * 137 + (p * 1600) % 137) % Math.max(1, y1 - y0));
+          const cote = k % 2 ? 1 : -1;
+          const lb = (40 + (by - cimeY) / Math.max(1, solY - cimeY) * 90) * E;
+          const bx = tx + Math.sin(by * .012) * 7 * E;
+          ctx.strokeStyle = "rgb(" + mix([48, 34, 22], [104, 76, 48], .4) + ")";
+          ctx.lineWidth = Math.max(2, largeur(by) * .3); ctx.lineCap = "round";
+          ctx.beginPath(); ctx.moveTo(bx, by);
+          ctx.quadraticCurveTo(bx + cote * lb * .6, by - lb * .3,
+                               bx + cote * lb, by - lb * .5);
+          ctx.stroke();
+          const fx = bx + cote * lb, fy = by - lb * .5;   // bouquet de feuilles
+          ctx.fillStyle = "rgba(" + mix([34, 92, 48], [122, 186, 96], .55)
+                        + "," + (.85 - nuit * .5) + ")";
+          for (let j = 0; j < 4; j++){
+            const a = j * 1.57 + k;
+            ctx.beginPath();
+            ctx.ellipse(fx + Math.cos(a) * lb * .22, fy + Math.sin(a) * lb * .18,
+                        lb * .3, lb * .22, a, 0, 6.283);
+            ctx.fill();
+          }
+        }
+      }
+    }
+
+    // ---- le sol, visible au tout début ----
+    if (solY < Hh + 80 * E){
+      ctx.fillStyle = "rgb(" + mix([58, 78, 44], [126, 158, 88], .55) + ")";
+      ctx.beginPath(); ctx.moveTo(0, Hh + 60 * E); ctx.lineTo(0, solY);
+      for (let x = 0; x <= W; x += 22 * E)
+        ctx.lineTo(x, solY + Math.sin(x * .009) * 12 * E);
+      ctx.lineTo(W, Hh + 60 * E); ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = "rgba(78,128,62,.9)"; ctx.lineWidth = 2 * E; ctx.lineCap = "round";
+      for (let i = 0; i < 40; i++){                  // touffes d'herbe
+        const hx = (i * 97 % 1000) / 1000 * W;
+        const hb = solY + Math.sin(hx * .009) * 12 * E;
+        ctx.beginPath(); ctx.moveTo(hx, hb);
+        ctx.quadraticCurveTo(hx + Math.sin(t0 + i) * 5 * E, hb - 12 * E,
+                             hx + Math.sin(t0 + i) * 9 * E, hb - 20 * E);
+        ctx.stroke();
+      }
+      if (aDebloque("tresor")){                      // nid posé sur une branche basse
+        const nx = W * .74, ny = solY - 54 * E;
+        ctx.fillStyle = "rgb(112,84,50)";
+        ctx.beginPath(); ctx.ellipse(nx, ny, 26 * E, 13 * E, 0, 0, 6.283); ctx.fill();
+        ctx.fillStyle = "rgb(74,54,32)";
+        ctx.beginPath(); ctx.ellipse(nx, ny - 4 * E, 20 * E, 8 * E, 0, 0, 6.283); ctx.fill();
+        ctx.fillStyle = "#EFE6D6";
+        for (let k = -1; k <= 1; k++){
+          ctx.beginPath();
+          ctx.ellipse(nx + k * 9 * E, ny - 5 * E, 5.5 * E, 6.5 * E, 0, 0, 6.283); ctx.fill();
+        }
+      }
+    }
+
+    // ---- montgolfière, à l'étage des nuages ----
+    if (aDebloque("boat") && fe > .8 && fe < 3.4){
+      const bx = W * .84 + Math.sin(t0 * .35) * 26 * E;
+      const by = Hh * .34 + Math.sin(t0 * .5) * 18 * E;
+      ctx.save(); ctx.translate(bx, by); ctx.rotate(Math.sin(t0 * .4) * .06);
+      const bg2 = ctx.createLinearGradient(-30 * E, 0, 30 * E, 0);
+      bg2.addColorStop(0, "#D9484F"); bg2.addColorStop(.5, "#F2E3C8");
+      bg2.addColorStop(1, "#D9484F");
+      ctx.fillStyle = bg2;
+      ctx.beginPath(); ctx.ellipse(0, 0, 30 * E, 36 * E, 0, Math.PI, 0); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(-30 * E, 0);
+      ctx.quadraticCurveTo(0, 34 * E, 30 * E, 0); ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = "rgba(60,42,28,.9)"; ctx.lineWidth = 1.6 * E;
+      ctx.beginPath(); ctx.moveTo(-11 * E, 30 * E); ctx.lineTo(-8 * E, 44 * E);
+      ctx.moveTo(11 * E, 30 * E); ctx.lineTo(8 * E, 44 * E); ctx.stroke();
+      ctx.fillStyle = "#8A5E34";
+      ctx.fillRect(-9 * E, 44 * E, 18 * E, 13 * E);
+      ctx.restore();
+    }
+
+    // ---- oiseaux ----
+    if (aDebloque("bg") && nuit < .9){
+      for (const o of oiseaux){
+        o.x += o.v * o.dir * lent * E * .6;
+        o.y += Math.sin(t0 * .8 + o.ph) * .4 * E;
+        if (o.dir > 0 ? o.x > W + 40 * E : o.x < -40 * E){
+          o.x = o.dir > 0 ? -40 * E : W + 40 * E;
+          o.y = Math.random() * Hh * .7;
+        }
+        const bat = Math.sin(t0 * 7 + o.ph);
+        ctx.strokeStyle = "rgba(38,44,54," + (.75 - nuit * .7) + ")";
+        ctx.lineWidth = 2 * E; ctx.lineCap = "round";
+        const l = o.t * E;
+        ctx.beginPath();
+        ctx.moveTo(o.x - l, o.y - bat * l * .5);
+        ctx.quadraticCurveTo(o.x, o.y + l * .18, o.x + l, o.y - bat * l * .5);
+        ctx.stroke();
+      }
+    }
+
+    // ---- feuilles qui tombent ----
+    for (const f of feuilles){
+      f.y += f.v * lent * E * .8;
+      f.x += Math.sin(f.y * .02 + f.rot) * .8 * E;
+      f.rot += f.vr;
+      if (f.y > Hh + 20 * E){ f.y = -20 * E; f.x = Math.random() * W; }
+      ctx.save(); ctx.translate(f.x, f.y); ctx.rotate(f.rot);
+      ctx.fillStyle = "hsla(" + f.h + ",52%," + (46 - nuit * 22) + "%," + (.8 - nuit * .55) + ")";
+      ctx.beginPath(); ctx.ellipse(0, 0, f.r * E, f.r * .45 * E, 0, 0, 6.283); ctx.fill();
+      ctx.restore();
+    }
+
+    // ---- le grimpeur, dont le moyen de transport suit l'altitude ----
+    if (aDebloque("diver")){
+      const monte = { sol:"ecureuil", canopee:"oiseau", nuages:"ballon",
+                      strato:"fusee", espace:"fusee" }[etage];
+      const ballant = Math.sin(t0 * 1.3) * 8 * E;
+      ctx.save(); ctx.translate(tx + 46 * E, dy + ballant);
+      GRIMPEURS[monte](ctx, E, "rgba(" + accent().map(Math.round) + ",.95)", t0);
+      ctx.restore();
+    }
+
+    // ---- aurore boréale sur les dernières secondes ----
+    if (etage === "espace"){
+      ctx.globalCompositeOperation = "lighter";
+      for (let i = 0; i < 3; i++){
+        const ag = ctx.createLinearGradient(0, Hh * .1, 0, Hh * .62);
+        const hue = 140 + i * 60 + Math.sin(t0 * .5 + i) * 30;
+        ag.addColorStop(0, "hsla(" + hue + ",90%,62%,0)");
+        ag.addColorStop(.45, "hsla(" + hue + ",90%,62%,.14)");
+        ag.addColorStop(1, "hsla(" + hue + ",90%,62%,0)");
+        ctx.fillStyle = ag;
+        ctx.beginPath();
+        for (let x = 0; x <= W; x += 26 * E){
+          const on = Math.sin(x * .004 + t0 * .6 + i * 2) * 60 * E
+                   + Math.sin(x * .011 + t0 * .9) * 26 * E;
+          ctx.lineTo(x, Hh * .12 + on);
+        }
+        for (let x = W; x >= 0; x -= 26 * E){
+          const on = Math.sin(x * .004 + t0 * .6 + i * 2) * 60 * E;
+          ctx.lineTo(x, Hh * .58 + on);
+        }
+        ctx.closePath(); ctx.fill();
+      }
+      ctx.globalCompositeOperation = "source-over";
+    }
+
+    // ---- la floraison : le climax ----
+    if (libre){
+      if (petales.length < 160 && Math.random() < .6)
+        petales.push({ x: Math.random() * W, y: -20 * E,
+                       r: (Math.random() * 6 + 5), rot: Math.random() * 6.3,
+                       vr: (Math.random() - .5) * .12, v: Math.random() * 1.6 + .8,
+                       ph: Math.random() * 6.3, h: 330 + Math.random() * 40 });
+      for (let i = petales.length - 1; i >= 0; i--){
+        const q = petales[i];
+        q.y += q.v * lent * E; q.x += Math.sin(q.y * .015 + q.ph) * 1.6 * E;
+        q.rot += q.vr;
+        if (q.y > Hh + 30 * E){ petales.splice(i, 1); continue; }
+        ctx.save(); ctx.translate(q.x, q.y); ctx.rotate(q.rot);
+        ctx.fillStyle = "hsla(" + q.h + ",82%,84%,.9)";
+        ctx.beginPath(); ctx.ellipse(0, 0, q.r * E, q.r * .55 * E, 0, 0, 6.283); ctx.fill();
+        ctx.restore();
+      }
+      ctx.globalCompositeOperation = "lighter";
+      const fg = ctx.createRadialGradient(W * .5, Hh * .42, 0, W * .5, Hh * .42, Hh);
+      fg.addColorStop(0, "rgba(255,214,240,.22)");
+      fg.addColorStop(1, "rgba(255,214,240,0)");
+      ctx.fillStyle = fg; ctx.fillRect(0, 0, W, Hh);
+      ctx.globalCompositeOperation = "source-over";
+    } else if (petales.length) petales.length = 0;
+
+    // voile central : garantit la lisibilité du compteur sur un ciel clair
+    const vg = ctx.createRadialGradient(W * .5, Hh * .42, 0, W * .5, Hh * .42,
+                                        Math.max(W, Hh) * .55);
+    vg.addColorStop(0, "rgba(6,14,26," + (.30 - nuit * .18) + ")");
+    vg.addColorStop(1, "rgba(6,14,26,0)");
+    ctx.fillStyle = vg; ctx.fillRect(0, 0, W, Hh);
+  }
+  /* ===================================================== */
 
   /* ================= MONDE 2 : les abysses =================
      La journée est une DESCENTE : on quitte le bateau le matin en surface et on
@@ -1604,20 +2109,25 @@
      RP : l'écran est le masque du plongeur. La vitre du manomètre puis celle du
      casque se fissurent quand la pression devient critique. */
   let rulePM = -1;                          // profondeur max déjà graduée
-  function construitRegle(PM){
+  function construitRegle(PM, arbre){
     if (rulePM === PM) return;
     rulePM = PM;
-    const pas = PM <= 40 ? 5 : PM <= 250 ? 25 : PM <= 700 ? 100 : 200;
+    // pas « rond » (1, 2 ou 5 × puissance de 10) visant ~8 repères : sinon une
+    // échelle de 40 km produisait deux cents graduations illisibles
+    const brut = PM / 8, dec = Math.pow(10, Math.floor(Math.log10(brut)));
+    const n = brut / dec;
+    const pas = (n <= 1 ? 1 : n <= 2 ? 2 : n <= 5 ? 5 : 10) * dec;
     let h = "";
     for (let m = 0; m <= PM; m += pas){
       const y = (m / PM) * 100, maj = (m % (pas * 2) === 0);
       h += '<i class="' + (maj ? "maj" : "") + '" style="top:' + y + '%;width:'
          + (maj ? 14 : 8) + 'px"></i>';
-      if (maj) h += '<b style="top:' + y + '%">' + m + '</b>';
+      const lib = m >= 2000 ? (m / 1000).toFixed(m % 1000 ? 1 : 0) + "k" : m;
+      if (maj) h += '<b style="top:' + y + '%">' + lib + '</b>';
     }
     $("drTicks").innerHTML = h;
     // graduations du cadran, une fois par échelle
-    const barMax = 1 + PM / 10;
+    const barMax = arbre ? 1013 : 1 + PM / 10;
     let t = "";
     for (let i = 0; i <= 8; i++){
       const a = (-120 + i * 30) * Math.PI / 180, maj = i % 2 === 0;
@@ -1631,16 +2141,31 @@
     $("pressGauge").dataset.max = barMax;
   }
   function majInstruments(secDep){
-    const PM = profMax();
-    construitRegle(PM);
-    // règle : le curseur descend avec nous
-    $("drCursor").style.top = Math.max(0, Math.min(100, profM / PM * 100)) + "%";
-    $("drVal").textContent = "−" + (profM < 100 ? profM.toFixed(1) : Math.round(profM));
-    // manomètre : 1 bar d'atmosphère + 1 bar par tranche de 10 m
-    const bar = 1 + profM / 10, barMax = Number($("pressGauge").dataset.max) || 1;
+    /* Même règle et même cadran pour les deux mondes, physique opposée :
+       en plongée la pression monte avec la profondeur, en altitude elle chute.  */
+    const arbre = save.actif === "arbre";
+    const MX = arbre ? altMax() : profMax();
+    const val = arbre ? altM : profM;
+    construitRegle(MX, arbre);
+    // règle : le curseur descend en plongée, remonte en ascension
+    const part = Math.max(0, Math.min(100, val / MX * 100));
+    $("drCursor").style.top = (arbre ? 100 - part : part) + "%";
+    $("drVal").textContent = (arbre ? "" : "−")
+      + (val < 100 ? val.toFixed(1) : Math.round(val));
+    // cadran : bar sous l'eau, hectopascals en altitude (loi barométrique)
+    let mes, unite, frac;
+    if (arbre){
+      mes = 1013 * Math.exp(-val / 8400);
+      unite = " hPa";
+      frac = 1 - mes / 1013;                       // l'aiguille monte quand ça se raréfie
+    } else {
+      mes = 1 + val / 10;
+      unite = " bar";
+      frac = mes / (Number($("pressGauge").dataset.max) || 1);
+    }
     $("pgNeedle").style.transform =
-      "rotate(" + (-120 + Math.min(1, bar / barMax) * 240).toFixed(1) + "deg)";
-    $("pgVal").textContent = bar.toFixed(bar < 100 ? 1 : 0) + " bar";
+      "rotate(" + (-120 + Math.max(0, Math.min(1, frac)) * 240).toFixed(1) + "deg)";
+    $("pgVal").textContent = mes.toFixed(mes < 100 ? 1 : 0) + unite;
     // état de la LED. Une fois le départ passé, tout redevient calme :
     // sinon les fissures resteraient à l'écran toute la soirée.
     const b = document.body, avant = secDep > 0;
@@ -2495,7 +3020,7 @@
       $("tExtra").textContent = String(Math.max(0, Math.floor((A.dep - now) / 3e5)));
     }
 
-    if (save.actif === "abysses") majInstruments(secDep);
+    if (save.actif === "abysses" || save.actif === "arbre") majInstruments(secDep);
 
     frames++;
     if (performance.now() - fpsT > 500){
@@ -2505,6 +3030,18 @@
 
     /* ---- rendu ---- */
     const [r, g2, bl] = accent();
+
+    if (save.actif === "arbre"){         // ===== MONDE 3 : l'ascension de l'arbre =====
+      dessineArbre(prog, enPause, alerte, phase === "libre", secDep);
+      for (let i = bursts.length - 1; i >= 0; i--){
+        const q = bursts[i];
+        q.x += q.vx; q.y += q.vy; q.vy += .18 * dpr; q.life -= .012;
+        if (q.life <= 0){ bursts.splice(i, 1); continue; }
+        ctx.fillStyle = `hsla(${q.hue},100%,65%,${q.life})`;
+        ctx.fillRect(q.x, q.y, 3 * dpr, 3 * dpr);
+      }
+      return;
+    }
 
     if (save.actif === "abysses"){       // ===== MONDE 2 : remontée des abysses =====
       dessineAbysses(prog, enPause, alerte, phase === "libre", secDep);
