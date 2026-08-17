@@ -1692,30 +1692,51 @@
      - d'1 h : scaphandre autonome
      - 10 min : scaphandre pieds-lourds, casque de cuivre et lampe
      - 1 min  : il a troqué le corps humain contre un sous-marin
-     Chaque tenue anime ses propres membres : battement de palmes, tuyau qui
-     ondule, hélice qui tourne. Une simple rotation d'ensemble faisait pantin. */
+
+     Les membres sont des CHAÎNES ARTICULÉES : chaque segment est dessiné dans le
+     repère de son parent (hanche → cuisse → mollet → palme). Rien ne peut se
+     détacher, et le retard de phase d'un segment sur l'autre donne le coup de
+     fouet du battement. */
+  function jambePalmee(c, u, t, cad, ph, teint, palme, lp){
+    c.save();
+    c.rotate(Math.sin(t * cad + ph) * .30);                    // cuisse
+    c.strokeStyle = teint; c.lineWidth = 6.5 * u; c.lineCap = "round";
+    c.beginPath(); c.moveTo(0, 0); c.lineTo(-11 * u, 0); c.stroke();
+    c.translate(-11 * u, 0);
+    c.rotate(Math.sin(t * cad + ph - .75) * .42);               // mollet, en retard
+    c.lineWidth = 5.4 * u;
+    c.beginPath(); c.moveTo(0, 0); c.lineTo(-11 * u, 0); c.stroke();
+    c.translate(-11 * u, 0);
+    c.rotate(Math.sin(t * cad + ph - 1.4) * .5);                // palme, encore en retard
+    c.fillStyle = palme;
+    c.beginPath(); c.moveTo(0, -3.5 * u);
+    c.lineTo(-lp * u, -7 * u); c.lineTo(-lp * .92 * u, 6 * u);
+    c.closePath(); c.fill();
+    c.restore();
+  }
+  function brasNage(c, u, t, cad, teint, ep){
+    c.save();
+    c.rotate(Math.sin(t * cad + .9) * .26);                     // épaule
+    c.strokeStyle = teint; c.lineWidth = ep * u; c.lineCap = "round";
+    c.beginPath(); c.moveTo(0, 0); c.lineTo(10 * u, 0); c.stroke();
+    c.translate(10 * u, 0);
+    c.rotate(Math.sin(t * cad + .3) * .3);                      // coude
+    c.lineWidth = ep * .88 * u;
+    c.beginPath(); c.moveTo(0, 0); c.lineTo(9 * u, 0); c.stroke();
+    c.restore();
+  }
+
   const EQUIPEMENTS = {
     nageur(c, u, glow, t){
-      const k = Math.sin(t * 3.4), k2 = Math.sin(t * 3.4 + 2.4);
-      const jambe = (dy, kk) => {                        // battement alterné
-        c.strokeStyle = "#E8B98F"; c.lineWidth = 6 * u; c.lineCap = "round";
-        c.beginPath(); c.moveTo(-8 * u, dy);
-        c.quadraticCurveTo(-18 * u, dy + kk * 4 * u, -28 * u, dy + kk * 9 * u);
-        c.stroke();
-        c.fillStyle = "#25A9C6";
-        c.save(); c.translate(-28 * u, dy + kk * 9 * u); c.rotate(kk * .45);
-        c.beginPath(); c.moveTo(0, -3 * u); c.lineTo(-18 * u, -8 * u);
-        c.lineTo(-17 * u, 6 * u); c.closePath(); c.fill();
-        c.restore();
-      };
-      jambe(-2 * u, k); jambe(3 * u, k2);
+      c.save(); c.translate(-6 * u, -3 * u);
+      jambePalmee(c, u, t, 3.2, 0,   "#E8B98F", "#25A9C6", 19); c.restore();
+      c.save(); c.translate(-6 * u, 3 * u);
+      jambePalmee(c, u, t, 3.2, 2.7, "#E8B98F", "#1E93AE", 19); c.restore();
+
       c.fillStyle = "#E8543F";                                                  // short
       c.beginPath(); c.ellipse(-7 * u, 0, 11 * u, 8 * u, 0, 0, 6.283); c.fill();
       c.fillStyle = "#F0C79C";                                                  // torse
       c.beginPath(); c.ellipse(8 * u, -1 * u, 16 * u, 8 * u, 0, 0, 6.283); c.fill();
-      c.strokeStyle = "#F0C79C"; c.lineWidth = 5 * u; c.lineCap = "round";      // bras qui rame
-      c.beginPath(); c.moveTo(12 * u, 1 * u);
-      c.quadraticCurveTo(22 * u, 4 * u + k * 3 * u, 31 * u, 5 * u + k * 7 * u); c.stroke();
       c.fillStyle = "#F0C79C";
       c.beginPath(); c.arc(23 * u, -6 * u, 8 * u, 0, 6.283); c.fill();          // tête
       c.fillStyle = "#3B2A1E";
@@ -1725,31 +1746,25 @@
       c.quadraticCurveTo(19 * u, -24 * u, 26 * u, -26 * u); c.stroke();
       c.fillStyle = glow;
       c.beginPath(); c.ellipse(28 * u, -6 * u, 5 * u, 4 * u, 0, 0, 6.283); c.fill();
+
+      c.save(); c.translate(13 * u, 2 * u);                                     // bras devant
+      brasNage(c, u, t, 3.2, "#F0C79C", 5); c.restore();
     },
 
     scuba(c, u, glow, t){
-      const k = Math.sin(t * 2.2), k2 = Math.sin(t * 2.2 + 2.6);
-      const palme = (dy, kk) => {                        // ondulation des palmes longues
-        c.fillStyle = "#1B4A6B";
-        c.save(); c.translate(-30 * u, dy + kk * 5 * u); c.rotate(kk * .38);
-        c.beginPath(); c.moveTo(0, -3 * u); c.lineTo(-26 * u, -10 * u);
-        c.lineTo(-24 * u, 6 * u); c.closePath(); c.fill();
-        c.restore();
-      };
-      palme(-5 * u, k); palme(4 * u, k2);
-      c.fillStyle = "#12283C";                                                  // jambes
-      c.beginPath(); c.moveTo(-4 * u, -7 * u);
-      c.quadraticCurveTo(-18 * u, -7 * u + k * 3 * u, -31 * u, -6 * u + k * 5 * u);
-      c.lineTo(-31 * u, 5 * u + k2 * 5 * u);
-      c.quadraticCurveTo(-18 * u, 6 * u + k2 * 3 * u, -4 * u, 7 * u);
-      c.closePath(); c.fill();
+      c.save(); c.translate(-4 * u, -4 * u);
+      jambePalmee(c, u, t, 2.1, 0,   "#12283C", "#1B4A6B", 26); c.restore();
+      c.save(); c.translate(-4 * u, 4 * u);
+      jambePalmee(c, u, t, 2.1, 2.8, "#12283C", "#164059", 26); c.restore();
+
       c.fillStyle = "#2E7590";                                                  // bloc, derrière
       c.beginPath(); c.ellipse(-8 * u, -14 * u, 13 * u, 6.5 * u, -.14, 0, 6.283); c.fill();
       c.fillStyle = "#17607E";
       c.beginPath(); c.ellipse(-19 * u, -15 * u, 3.4 * u, 4.2 * u, 0, 0, 6.283); c.fill();
       c.strokeStyle = "#0E2437"; c.lineWidth = 2.4 * u;                          // détendeur
       c.beginPath(); c.moveTo(0, -13 * u);
-      c.quadraticCurveTo(16 * u + k * 3 * u, -20 * u, 24 * u, -8 * u); c.stroke();
+      c.quadraticCurveTo(16 * u + Math.sin(t * 2.1) * 2.5 * u, -20 * u, 24 * u, -8 * u);
+      c.stroke();
       c.fillStyle = "#12283C";                                                  // buste
       c.beginPath(); c.ellipse(6 * u, 0, 19 * u, 10.5 * u, 0, 0, 6.283); c.fill();
       c.fillStyle = "#1E5C82";                                                  // gilet stab
@@ -1757,9 +1772,6 @@
       c.strokeStyle = "#F2B33D"; c.lineWidth = 2 * u;                           // sangles
       c.beginPath(); c.moveTo(-2 * u, -9 * u); c.lineTo(-1 * u, 9 * u); c.stroke();
       c.beginPath(); c.moveTo(9 * u, -8 * u); c.lineTo(10 * u, 9 * u); c.stroke();
-      c.strokeStyle = "#12283C"; c.lineWidth = 5.5 * u; c.lineCap = "round";     // bras qui palme
-      c.beginPath(); c.moveTo(13 * u, 5 * u);
-      c.quadraticCurveTo(23 * u, 7 * u + k * 2 * u, 31 * u, 8 * u + k * 5 * u); c.stroke();
       c.fillStyle = "#0E2437";                                                  // cagoule
       c.beginPath(); c.arc(27 * u, -6 * u, 9.5 * u, 0, 6.283); c.fill();
       c.strokeStyle = "rgba(150,205,230,.45)"; c.lineWidth = 1.4 * u;
@@ -1770,31 +1782,53 @@
       c.beginPath(); c.ellipse(32.5 * u, -7 * u, 6 * u, 4.2 * u, .12, 0, 6.283); c.fill();
       c.fillStyle = "rgba(255,255,255,.55)";
       c.beginPath(); c.ellipse(34 * u, -8.6 * u, 2 * u, 1.2 * u, .3, 0, 6.283); c.fill();
+
+      c.save(); c.translate(14 * u, 4 * u);                                     // bras devant
+      brasNage(c, u, t, 2.1, "#12283C", 5.5); c.restore();
     },
 
     scaphandre(c, u, glow, t){
-      // le narguilé ondule doucement : c'est le seul mouvement d'un pieds-lourds
+      // le narguilé ondule sur toute sa longueur : seul mouvement ample d'un pieds-lourds
       c.strokeStyle = "rgba(140,118,80,.75)"; c.lineWidth = 3.2 * u;
       c.beginPath(); c.moveTo(2 * u, -16 * u);
       c.bezierCurveTo(-30 * u + Math.sin(t * .8) * 12 * u, -60 * u,
                       -2 * u + Math.sin(t * .6 + 1) * 16 * u, -96 * u,
                       -8 * u + Math.sin(t * .5) * 20 * u, -150 * u);
       c.stroke();
-      const pas = Math.sin(t * 1.4);                     // pas lourd, alterné
-      c.fillStyle = "#3E3220";
-      c.fillRect(-38 * u, -12 * u + pas * 3 * u, 14 * u, 10 * u);
-      c.fillRect(-38 * u, 3 * u - pas * 3 * u, 14 * u, 10 * u);
+
+      const patte = (yh, ph) => {                    // jambe lestée, articulée et lente
+        c.save(); c.translate(-14 * u, yh);
+        c.rotate(Math.sin(t * 1.3 + ph) * .16);
+        c.strokeStyle = "#5F5C46"; c.lineWidth = 9 * u; c.lineCap = "round";
+        c.beginPath(); c.moveTo(0, 0); c.lineTo(-13 * u, 0); c.stroke();
+        c.translate(-13 * u, 0);
+        c.rotate(Math.sin(t * 1.3 + ph - .5) * .2);
+        c.lineWidth = 8 * u;
+        c.beginPath(); c.moveTo(0, 0); c.lineTo(-10 * u, 0); c.stroke();
+        c.translate(-10 * u, 0);
+        c.fillStyle = "#3E3220";                     // botte de plomb
+        c.fillRect(-11 * u, -6 * u, 13 * u, 12 * u);
+        c.restore();
+      };
+      patte(-6 * u, 0); patte(6 * u, 2.4);
+
       c.fillStyle = "#6E6A52";                                                  // toile
-      c.beginPath(); c.ellipse(-6 * u, 0, 27 * u, 15 * u, 0, 0, 6.283); c.fill();
+      c.beginPath(); c.ellipse(-4 * u, 0, 26 * u, 15 * u, 0, 0, 6.283); c.fill();
       c.strokeStyle = "rgba(0,0,0,.22)"; c.lineWidth = 1.6 * u;                 // plis
       for (let k = -2; k <= 2; k++){
         c.beginPath();
-        c.ellipse(-6 * u + k * 8 * u, 0, 3 * u, 14 * u, 0, 0, 6.283); c.stroke();
+        c.ellipse(-4 * u + k * 8 * u, 0, 3 * u, 14 * u, 0, 0, 6.283); c.stroke();
       }
-      c.strokeStyle = "#6E6A52"; c.lineWidth = 7 * u; c.lineCap = "round";      // bras qui pend
-      c.beginPath(); c.moveTo(6 * u, 6 * u);
-      c.quadraticCurveTo(16 * u, 14 * u + pas * 3 * u, 22 * u, 18 * u + pas * 5 * u);
-      c.stroke();
+      c.save(); c.translate(8 * u, 6 * u);                                      // bras articulé
+      c.rotate(.5 + Math.sin(t * 1.3) * .18);
+      c.strokeStyle = "#6E6A52"; c.lineWidth = 7.5 * u; c.lineCap = "round";
+      c.beginPath(); c.moveTo(0, 0); c.lineTo(12 * u, 0); c.stroke();
+      c.translate(12 * u, 0);
+      c.rotate(Math.sin(t * 1.3 - .6) * .22);
+      c.lineWidth = 6.5 * u;
+      c.beginPath(); c.moveTo(0, 0); c.lineTo(10 * u, 0); c.stroke();
+      c.restore();
+
       c.fillStyle = "#8A6A2E";                                                  // collerette
       c.beginPath(); c.ellipse(15 * u, -3 * u, 8 * u, 13 * u, 0, 0, 6.283); c.fill();
       c.fillStyle = "#A87F3C";                                                  // casque cuivre
@@ -1819,17 +1853,37 @@
     },
 
     sousmarin(c, u, glow, t){
-      c.strokeStyle = "#7E8E9A"; c.lineWidth = 3 * u;                           // arbre d'hélice
+      // remous de l'hélice : trainée de tourbillons derrière la poupe
+      c.globalCompositeOperation = "lighter";
+      for (let i = 0; i < 5; i++){
+        const m = ((t * .9 + i * .2) % 1);
+        c.fillStyle = "rgba(190,232,255," + (.16 * (1 - m)) + ")";
+        c.beginPath();
+        c.arc(-62 * u - m * 60 * u, Math.sin(t * 5 + i) * 5 * u,
+              (4 + m * 13) * u, 0, 6.283);
+        c.fill();
+      }
+      c.globalCompositeOperation = "source-over";
+
+      c.strokeStyle = "#7E8E9A"; c.lineWidth = 3 * u;                           // arbre
       c.beginPath(); c.moveTo(-46 * u, 0); c.lineTo(-56 * u, 0); c.stroke();
-      c.fillStyle = "#9AAAB6";                                                  // hélice
-      c.beginPath();
-      c.ellipse(-58 * u, 0, 3 * u, (Math.abs(Math.sin(t * 7)) * 9 + 3) * u, 0, 0, 6.283);
-      c.fill();
+      c.save(); c.translate(-58 * u, 0);                                        // hélice qui tourne
+      c.rotate(t * 9);
+      c.fillStyle = "#9AAAB6";
+      for (let k = 0; k < 3; k++){
+        c.save(); c.rotate(k * 2.094);
+        c.beginPath(); c.ellipse(0, -9 * u, 3.2 * u, 9 * u, 0, 0, 6.283); c.fill();
+        c.restore();
+      }
+      c.restore();
       c.fillStyle = "#33505F";                                                  // gouvernails
       c.beginPath(); c.moveTo(-38 * u, -5 * u); c.lineTo(-52 * u, -20 * u);
       c.lineTo(-36 * u, -13 * u); c.closePath(); c.fill();
       c.beginPath(); c.moveTo(-38 * u, 5 * u); c.lineTo(-52 * u, 20 * u);
       c.lineTo(-36 * u, 13 * u); c.closePath(); c.fill();
+      // barres de plongée qui s'inclinent, comme si l'engin pilotait sa descente
+      c.save(); c.translate(24 * u, 6 * u); c.rotate(.25 + Math.sin(t * .7) * .22);
+      c.fillStyle = "#33505F"; c.fillRect(-3 * u, 0, 6 * u, 17 * u); c.restore();
       c.fillStyle = "#426274";                                                  // coque
       c.beginPath(); c.ellipse(0, 0, 46 * u, 16 * u, 0, 0, 6.283); c.fill();
       c.fillStyle = "#5A8091";
@@ -1837,29 +1891,33 @@
       c.fillStyle = "#33505F";                                                  // kiosque
       c.fillRect(-8 * u, -27 * u, 21 * u, 15 * u);
       c.beginPath(); c.ellipse(2.5 * u, -27 * u, 10.5 * u, 4 * u, 0, 0, 6.283); c.fill();
-      c.strokeStyle = "#33505F"; c.lineWidth = 2.4 * u;                          // périscope
-      c.beginPath(); c.moveTo(9 * u, -28 * u); c.lineTo(9 * u, -42 * u);
-      c.lineTo(16 * u, -42 * u); c.stroke();
-      for (let i = 0; i < 4; i++){                                              // hublots qui s'allument en vague
+      c.save(); c.translate(9 * u, -28 * u);                                    // périscope qui pivote
+      c.rotate(Math.sin(t * .45) * .3);
+      c.strokeStyle = "#33505F"; c.lineWidth = 2.4 * u; c.lineCap = "round";
+      c.beginPath(); c.moveTo(0, 0); c.lineTo(0, -14 * u); c.lineTo(7 * u, -14 * u); c.stroke();
+      c.restore();
+      for (let i = 0; i < 4; i++){                                              // hublots en vague
         const hx = [-26, -10, 6, 22][i];
         const bat = .55 + Math.sin(t * 1.6 - i * .7) * .45;
         c.fillStyle = "#08202E";
         c.beginPath(); c.arc(hx * u, 1 * u, 5.2 * u, 0, 6.283); c.fill();
-        c.globalAlpha = bat;
-        c.fillStyle = glow;
+        c.globalAlpha = bat; c.fillStyle = glow;
         c.beginPath(); c.arc(hx * u, 1 * u, 3.6 * u, 0, 6.283); c.fill();
         c.globalAlpha = 1;
       }
-      c.globalCompositeOperation = "lighter";                                   // cône du projecteur
-      const cg = c.createLinearGradient(45 * u, 0, 190 * u, 0);
-      cg.addColorStop(0, "rgba(230,246,255,.20)");
+      c.save(); c.translate(45 * u, -2 * u);                                    // projecteur qui balaie
+      c.rotate(Math.sin(t * .55) * .18);
+      c.globalCompositeOperation = "lighter";
+      const cg = c.createLinearGradient(0, 0, 150 * u, 0);
+      cg.addColorStop(0, "rgba(230,246,255,.22)");
       cg.addColorStop(1, "rgba(230,246,255,0)");
       c.fillStyle = cg;
-      c.beginPath(); c.moveTo(45 * u, -5 * u); c.lineTo(190 * u, -46 * u);
-      c.lineTo(190 * u, 46 * u); c.lineTo(45 * u, 5 * u); c.closePath(); c.fill();
+      c.beginPath(); c.moveTo(0, -4 * u); c.lineTo(150 * u, -42 * u);
+      c.lineTo(150 * u, 42 * u); c.lineTo(0, 4 * u); c.closePath(); c.fill();
       c.globalCompositeOperation = "source-over";
       c.fillStyle = "#F2ECC8";
-      c.beginPath(); c.arc(45 * u, -2 * u, 5.4 * u, 0, 6.283); c.fill();
+      c.beginPath(); c.arc(0, 0, 5.4 * u, 0, 6.283); c.fill();
+      c.restore();
     }
   };
 
@@ -2165,20 +2223,27 @@
 
     // ---- le plongeur, dont l'équipement suit la profondeur ----
     if (aDebloque("diver")){
-      const dxp = W * .17, tang = Math.sin(t0 * 1.1) * .07;
+      const dxp = W * .17, E2 = ech() * dpr;
       const tenue = secDep > 3600 ? "nageur" : secDep > 600 ? "scuba"
                   : secDep > 60   ? "scaphandre" : "sousmarin";
+      // Il monte et descend au rythme de sa nage : sans ce ballant il paraissait
+      // suspendu à un fil. Le pieds-lourds tangue peu, il est lesté.
+      const AMPL = { nageur:11, scuba:9, scaphandre:4, sousmarin:6 }[tenue];
+      const CAD  = { nageur:1.6, scuba:1.05, scaphandre:.65, sousmarin:.5 }[tenue];
+      const ballant = Math.sin(t0 * CAD) * AMPL * E2;
+      const tang = Math.sin(t0 * CAD + .9) * .06;
       // le sous-marin descend à plat ; un corps humain pique du nez
       const pique = tenue === "sousmarin" ? .12 : tenue === "scaphandre" ? .18 : .42;
-      ctx.save(); ctx.translate(dxp, dy); ctx.rotate(pique + tang * (tenue === "sousmarin" ? .3 : 1));
-      EQUIPEMENTS[tenue](ctx, dpr, "rgba(" + accent().map(Math.round) + ",.95)", t0);
+      ctx.save(); ctx.translate(dxp, dy + ballant);
+      ctx.rotate(pique + tang * (tenue === "sousmarin" ? .5 : 1));
+      EQUIPEMENTS[tenue](ctx, E2, "rgba(" + accent().map(Math.round) + ",.95)", t0);
       ctx.restore();
 
       // faisceau : seuls le scaphandre et le sous-marin portent une vraie lampe
       const lampe = tenue === "scaphandre" ? 1 : tenue === "sousmarin" ? 1.5 : 0;
       if (lampe && clarte < .35){
         ctx.globalCompositeOperation = "lighter";
-        const lx = dxp + 34 * dpr, ly = dy + 4 * dpr, R = 260 * dpr * lampe;
+        const lx = dxp + 34 * E2, ly = dy + ballant + 4 * E2, R = 260 * E2 * lampe;
         const lg = ctx.createRadialGradient(lx, ly, 0, lx, ly, R);
         lg.addColorStop(0, "rgba(200,242,255," + (.18 * lampe) + ")");
         lg.addColorStop(1, "rgba(200,242,255,0)");
@@ -2187,7 +2252,7 @@
       }
 
       if (bulles.length < 40 && Math.random() < (enPause ? .2 : .4))
-        bulles.push({ x: dxp + 22 * dpr + (Math.random() - .5) * 10 * dpr, y: dy - 10 * dpr,
+        bulles.push({ x: dxp + 22 * E2 + (Math.random() - .5) * 10 * E2, y: dy + ballant - 10 * E2,
                       r: (Math.random() * 3 + 1.2) * dpr,
                       v: (Math.random() * 1.4 + .9) * dpr, ph: Math.random() * 6.3 });
     } else if (bulles.length < 6 && Math.random() < .04){
