@@ -1313,8 +1313,10 @@
      révèle que dans le noir. Chaque espèce rayonne de sa propre couleur.
        t = couleur   r = rayon (× la taille)   i = intensité   v = vitesse de pulsation */
   const LUEURS = {
-    Football_Fish:        { t:"255,238,160", r:1.55, i:.95, v:2.6 },  // le leurre
-    Gold_Football_Fish:   { t:"255,206,74",  r:2.10, i:1.4, v:2.2 },
+    // foyer : position de la lanterne sur le sprite, en fraction (0,0 = coin haut-gauche).
+    // Sert à la fois d'ancrage du halo et de source pour éclairer la face du poisson.
+    Football_Fish:        { t:"255,238,160", r:1.55, i:.95, v:2.6, foyer:[.16, .25] },
+    Gold_Football_Fish:   { t:"255,206,74",  r:2.10, i:1.4, v:2.2, foyer:[.16, .25] },
     Blue_Moon_Jellyfish:  { t:"90,158,255",  r:1.45, i:.55, v:1.2 },
     Green_Moon_Jellyfish: { t:"104,255,176", r:1.45, i:.55, v:1.2 },
     Diamond_Jellyfish:    { t:"206,244,255", r:1.90, i:.95, v:1.6 },
@@ -1486,6 +1488,20 @@
     g.globalCompositeOperation = "source-atop";   // ne peint que le sujet, pas le vide
     g.fillStyle = "rgba(" + r + "," + v + "," + b + "," + (.5 + f * .45) + ")";
     g.fillRect(0, 0, c.width, c.height);
+
+    // Une créature qui porte sa propre lampe s'éclaire elle-même : on rallume la
+    // face autour du foyer, sinon le poisson reste noir à côté d'un halo lumineux.
+    const lu = LUEURS[cle];
+    if (lu && lu.foyer){
+      const fx = lu.foyer[0] * c.width, fy = lu.foyer[1] * c.height;
+      const rg = g.createRadialGradient(fx, fy, 0, fx, fy, c.width * .58);
+      rg.addColorStop(0,   "rgba(" + lu.t + ",.95)");
+      rg.addColorStop(.16, "rgba(" + lu.t + ",.55)");
+      rg.addColorStop(.55, "rgba(" + lu.t + ",.14)");
+      rg.addColorStop(1,   "rgba(" + lu.t + ",0)");
+      g.fillStyle = rg;                            // toujours en source-atop
+      g.fillRect(0, 0, c.width, c.height);
+    }
     return teintes[k] = c;
   }
 
@@ -2198,14 +2214,27 @@
           const force = lu.i * (.18 + (1 - clarte) * .82)
                       * (.55 + Math.sin(t0 * lu.v + s.ph) * .45) * (.5 + s.op * .5);
           if (force > .02){
-            const R = s.t * 3.2 * lu.r;
-            const hg = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, R);
-            hg.addColorStop(0,  "rgba(" + lu.t + "," + (force * .55) + ")");
-            hg.addColorStop(.45,"rgba(" + lu.t + "," + (force * .18) + ")");
-            hg.addColorStop(1,  "rgba(" + lu.t + ",0)");
+            const dd = s.t * 3.2, R = dd * lu.r;
+            // le halo part de la lanterne, pas du milieu du poisson.
+            // Le sprite est miroité selon le sens de nage : l'ancrage suit.
+            const gx = lu.foyer ? s.x - s.dir * (lu.foyer[0] - .5) * dd : s.x;
+            const gy = lu.foyer ? s.y + (lu.foyer[1] - .5) * dd : s.y;
             ctx.globalCompositeOperation = "lighter";
+            const hg = ctx.createRadialGradient(gx, gy, 0, gx, gy, R);
+            hg.addColorStop(0,  "rgba(" + lu.t + "," + (force * .6) + ")");
+            hg.addColorStop(.35,"rgba(" + lu.t + "," + (force * .22) + ")");
+            hg.addColorStop(1,  "rgba(" + lu.t + ",0)");
             ctx.fillStyle = hg;
-            ctx.beginPath(); ctx.arc(s.x, s.y, R, 0, 6.283); ctx.fill();
+            ctx.beginPath(); ctx.arc(gx, gy, R, 0, 6.283); ctx.fill();
+            if (lu.foyer){                          // le foyer lui-même : un point blanc
+              const rc = dd * .055;
+              const cg = ctx.createRadialGradient(gx, gy, 0, gx, gy, rc * 3.2);
+              cg.addColorStop(0,  "rgba(255,255,255," + Math.min(1, force * 1.5) + ")");
+              cg.addColorStop(.34,"rgba(" + lu.t + "," + (force * .75) + ")");
+              cg.addColorStop(1,  "rgba(" + lu.t + ",0)");
+              ctx.fillStyle = cg;
+              ctx.beginPath(); ctx.arc(gx, gy, rc * 3.2, 0, 6.283); ctx.fill();
+            }
             ctx.globalCompositeOperation = "source-over";
           }
         }
