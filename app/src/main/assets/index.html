@@ -864,9 +864,9 @@
       { id:"rate2",  nom:"+1 🌿 / min",          cout:300, pre:"saison", row:7, col:1 },
       { id:"orange", nom:"800 m · les nuages",   cout:120, pre:"jaune",  row:7, col:2 },
 
-      { id:"rouge",  nom:"L'espace · 5 min",      cout:220, pre:"orange", row:8, col:2 },
-      { id:"violet", nom:"Dépasser la Lune · 1 min", cout:400, pre:"rouge", row:9, col:2 },
-      { id:"arc",    nom:"LE TROU NOIR · 10 s",   cout:800, pre:"violet", row:10, col:2 }
+      { id:"rouge",  nom:"L'espace · 400 km",    cout:220, pre:"orange", row:8, col:2 },
+      { id:"violet", nom:"Dépasser la Lune",      cout:400, pre:"rouge",  row:9, col:2 },
+      { id:"arc",    nom:"LE TROU NOIR",          cout:800, pre:"violet", row:10, col:2 }
     ]
   };
   const ORDRE_MONDES = ["neon", "abysses", "arbre"];   // ordre de déblocage par prestige
@@ -1832,13 +1832,10 @@
 
   /* Les six étages du voyage, calés sur les mêmes seuils que les paliers de
      couleur : la prairie le matin, le trou noir aux dix dernières secondes. */
+  /* Un étage par tranche de 20 % de la journée. Calés sur les seuils d'alerte,
+     ils s'entassaient tous dans la dernière heure : on passait la matinée dans
+     l'herbe et tout le voyage en quinze minutes. */
   const ETAGES = ["prairie", "ciel", "nuages", "espace", "lune", "trou"];
-  const etageDe = s => s > 3600 ? "prairie"     // + d'1 h : au ras de l'herbe
-                     : s > 1200 ? "ciel"        // 1 h    : plein ciel
-                     : s >  300 ? "nuages"      // 20 min : la couche nuageuse
-                     : s >   60 ? "espace"      // 5 min  : le noir et les étoiles
-                     : s >   10 ? "lune"        // 1 min  : on dépasse la Lune
-                     :            "trou";       // 10 s   : le trou noir
   /* Trois arrêts par étage : zénith, plein ciel, horizon. Deux seulement
      donnaient une teinte moyenne uniforme, sans la respiration d'un vrai ciel. */
   const CIEL = {
@@ -1849,17 +1846,6 @@
     lune:    { h:[1, 2, 8],       m:[6, 6, 26],      b:[20, 12, 46]    },
     trou:    { h:[0, 0, 0],       m:[3, 1, 11],      b:[12, 3, 24]     }
   };
-  const ANCRES_CIEL = [[14400, 0], [3600, 1], [1200, 2], [300, 3], [60, 4], [10, 5], [0, 5]];
-  // position continue dans les étages, pour que le ciel change sans à-coups
-  function etageFlot(s){
-    s = Math.max(0, s);
-    if (s >= 14400) return 0;
-    for (let i = 0; i < ANCRES_CIEL.length - 1; i++){
-      const [a, va] = ANCRES_CIEL[i], [b, vb] = ANCRES_CIEL[i + 1];
-      if (s <= a && s >= b) return vb + (va - vb) * (s - b) / (a - b);
-    }
-    return ETAGES.length - 1;
-  }
   function couleurCiel(f, cle){
     const i = Math.min(ETAGES.length - 2, Math.max(0, Math.floor(f))), t = f - i;
     return mix(CIEL[ETAGES[i]][cle], CIEL[ETAGES[i + 1]][cle], Math.max(0, Math.min(1, t)));
@@ -1962,6 +1948,106 @@
       c.fill();
     }
     c.restore();
+  }
+
+  /* ---- le système solaire de la libération ----
+     Une fois la journée finie, l'arbre n'est plus dans le monde : il EST le
+     monde, et les planètes lui tournent autour. La moitié d'orbite qui passe
+     derrière est tracée avant le tronc, l'autre après — sans ça, tout flotte
+     devant l'arbre et la profondeur disparaît. */
+  const PLANETES = [
+    { r:0.60, t:6.5,  d:0.044, c:["#C9C4BA", "#6E6A63"] },
+    { r:0.92, t:11,   d:0.066, c:["#F2D9A0", "#A8873F"] },
+    { r:1.28, t:17,   d:0.070, c:["#7FB6E8", "#1E4C86"], lune:true },
+    { r:1.68, t:26,   d:0.058, c:["#E08A5A", "#8C3E20"] },
+    { r:2.22, t:44,   d:0.125, c:["#DCBA8E", "#8A6438"], bandes:true },
+    { r:2.76, t:66,   d:0.110, c:["#EBD8A6", "#A88C4C"], anneau:true },
+    { r:3.20, t:92,   d:0.082, c:["#A8E4E0", "#3C7E86"] },
+    { r:3.58, t:124,  d:0.078, c:["#7FA0E8", "#2C3F86"] }
+  ];
+  const APLAT = 0.34;                        // le plan des orbites vu presque par la tranche
+
+  function dessineSysteme(cx, cy, t, E, devant){
+    const U = Math.min(W, Hh) * 0.158;
+    ctx.save();
+    ctx.translate(cx, cy);
+    if (!devant){
+      // l'arbre est l'astre de ce système : c'est de lui que vient la lumière
+      ctx.save();
+      ctx.globalCompositeOperation = "lighter";
+      const ag = ctx.createRadialGradient(0, 0, 0, 0, 0, U * 1.3);
+      ag.addColorStop(0, "rgba(186,150,255,.34)");
+      ag.addColorStop(.4, "rgba(126,96,220,.13)");
+      ag.addColorStop(1, "rgba(90,60,180,0)");
+      ctx.fillStyle = ag;
+      ctx.beginPath(); ctx.arc(0, 0, U * 1.3, 0, 6.2832); ctx.fill();
+      ctx.restore();
+      for (const pl of PLANETES){            // les rails, une seule fois, au fond
+        ctx.strokeStyle = "rgba(168,196,255," + (0.24 + 0.07 * Math.sin(t * .5 + pl.r)) + ")";
+        ctx.lineWidth = Math.max(1.2, E * 1.2);
+        ctx.beginPath();
+        ctx.ellipse(0, 0, pl.r * U, pl.r * U * APLAT, 0, 0, 6.2832);
+        ctx.stroke();
+      }
+    }
+    for (const pl of PLANETES){
+      const a = t * 6.2832 / pl.t + pl.r * 2.7;
+      const sy = Math.sin(a);
+      // sin > 0 : la planète est du côté proche, donc devant l'arbre
+      if ((sy > 0) !== devant) continue;
+      const x = Math.cos(a) * pl.r * U, y = sy * pl.r * U * APLAT;
+      const rr = pl.d * U * (0.82 + sy * 0.18);   // un peu plus grosse quand elle approche
+      ctx.save();
+      ctx.translate(x, y);
+      if (pl.anneau){                        // l'anneau passe derrière avant la boule
+        ctx.strokeStyle = "rgba(226,208,160,.55)";
+        ctx.lineWidth = rr * .30;
+        ctx.beginPath(); ctx.ellipse(0, 0, rr * 2.1, rr * .62, -.42, Math.PI, 6.2832); ctx.stroke();
+      }
+      ctx.save();
+      ctx.globalCompositeOperation = "lighter";
+      const hg = ctx.createRadialGradient(0, 0, rr * .8, 0, 0, rr * 2.6);
+      hg.addColorStop(0, pl.c[0] + "66");
+      hg.addColorStop(1, "rgba(0,0,0,0)");
+      ctx.fillStyle = hg;
+      ctx.beginPath(); ctx.arc(0, 0, rr * 2.6, 0, 6.2832); ctx.fill();
+      ctx.restore();
+      const g = ctx.createRadialGradient(-rr * .34, -rr * .34, rr * .06, 0, 0, rr);
+      g.addColorStop(0, pl.c[0]); g.addColorStop(1, pl.c[1]);
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.arc(0, 0, rr, 0, 6.2832); ctx.fill();
+      if (pl.bandes){
+        ctx.save();
+        ctx.beginPath(); ctx.arc(0, 0, rr, 0, 6.2832); ctx.clip();
+        for (let i = -2; i <= 2; i++){
+          ctx.fillStyle = i % 2 ? "rgba(140,98,58,.32)" : "rgba(246,226,190,.26)";
+          ctx.fillRect(-rr, i * rr * .34 - rr * .10, rr * 2, rr * .21);
+        }
+        ctx.restore();
+      }
+      if (pl.anneau){
+        ctx.strokeStyle = "rgba(240,224,180,.8)";
+        ctx.lineWidth = rr * .30;
+        ctx.beginPath(); ctx.ellipse(0, 0, rr * 2.1, rr * .62, -.42, 0, Math.PI); ctx.stroke();
+      }
+      if (pl.lune){
+        const b = t * 2.4 + pl.r;
+        ctx.fillStyle = "#D8D4CC";
+        ctx.beginPath();
+        ctx.arc(Math.cos(b) * rr * 2.4, Math.sin(b) * rr * 1.1, rr * .30, 0, 6.2832);
+        ctx.fill();
+      }
+      // croissant d'ombre : la lumière vient de l'arbre, au centre
+      ctx.globalCompositeOperation = "source-atop";
+      const og = ctx.createRadialGradient(x * .04, y * .04, rr * .2, 0, 0, rr * 1.5);
+      og.addColorStop(0, "rgba(0,0,0,0)");
+      og.addColorStop(1, "rgba(2,2,10,.55)");
+      ctx.fillStyle = og;
+      ctx.beginPath(); ctx.arc(0, 0, rr, 0, 6.2832); ctx.fill();
+      ctx.globalCompositeOperation = "source-over";
+      ctx.restore();
+    }
+    ctx.restore();
   }
 
   /* Le soleil et ses rais, cuits une fois en 512 px. Vingt-deux secteurs
@@ -2468,12 +2554,15 @@ function dessineTronc(c, E, tx, cimeY, basY, t, nuit) {
    déterminent la variante, et une variante ne se recalcule qu'au changement. */
 const BOUQUETS = { cle: "", tab: null };
 const BQ_TAILLE = 232, BQ_N = 6;
+let ARBRE_COSMOS = false;
+// une fois libéré, chaque feuille devient un morceau de ciel profond
+const RAMPE_COSMOS = [0x05030f, 0x0c0722, 0x18103c, 0x2a1a62, 0x46309c, 0x7a5ad8];
 
-function cuitBouquets(saison, nuitQ) {
-  const cle = saison.nom + "|" + nuitQ;
+function cuitBouquets(saison, nuitQ, cosmos) {
+  const cle = (cosmos ? "cosmos" : saison.nom) + "|" + nuitQ;
   if (BOUQUETS.cle === cle) return BOUQUETS.tab;
-  const n = nuitQ / 10, k = n * 0.62;
-  const P = saison.rampe.map((v) => [
+  const n = cosmos ? 0 : nuitQ / 10, k = n * 0.62;
+  const P = (cosmos ? RAMPE_COSMOS : saison.rampe).map((v) => [
     ((((v >> 16) & 255) * (1 - k) + 14 * k) | 0),
     ((((v >> 8) & 255) * (1 - k) + 30 * k) | 0),
     (((v & 255) * (1 - k) + 48 * k) | 0)
@@ -2512,6 +2601,22 @@ function cuitBouquets(saison, nuitQ) {
       g.quadraticCurveTo(-len * 0.05, -w * 0.30, -len * 0.34, -w * 0.12);
       g.closePath();
       g.fillStyle = rgb(Math.min(5, ton + 2), 0.34); g.fill();
+      if (cosmos) {
+        // la feuille est une fenêtre : nébuleuse au fond, étoiles par-dessus
+        const ng = g.createRadialGradient(len * .1, 0, 0, 0, 0, len * .55);
+        ng.addColorStop(0, "rgba(150,90,220,.34)");
+        ng.addColorStop(1, "rgba(40,20,90,0)");
+        g.fillStyle = ng;
+        g.beginPath(); g.ellipse(0, 0, len * .5, w * .95, 0, 0, 6.2832); g.fill();
+        for (let q = 0; q < 4; q++) {
+          const s1 = Math.abs(Math.sin((x + y + q) * 91.7)) % 1;
+          const s2 = Math.abs(Math.sin((x - y + q) * 47.3)) % 1;
+          g.fillStyle = "rgba(255,255,250," + (0.4 + s1 * 0.6).toFixed(2) + ")";
+          g.beginPath();
+          g.arc((s1 - .5) * len * .7, (s2 - .5) * w * 1.2, len * .035, 0, 6.2832);
+          g.fill();
+        }
+      }
       g.restore();
     }
 
@@ -2567,7 +2672,7 @@ function dessineFeuillage(c, E, x, y, taille, graine, t, nuit) {
   const R = taille * E;
   if (!(R > 1)) return;
   const nq = Math.round(Math.min(1, Math.max(0, nuit || 0)) * 10);
-  const tab = cuitBouquets(SAISON, nq);
+  const tab = cuitBouquets(SAISON, nq, ARBRE_COSMOS);
   /* Le hachage vient de la graine de l'ancre, jamais de sa position : celle-ci
      dérive avec le balancement, et la variante de sprite changeait à chaque
      frame — le bouquet clignotait d'une texture à l'autre. */
@@ -3059,9 +3164,10 @@ function dessineNid(c, E, x, y, t, nuit) {
     const p = Math.max(0, Math.min(1, prog));
     const lent = reduce ? .35 : 1;
     const t0 = performance.now() / 1000;
-    const fe = libre ? ETAGES.length - 1 : etageFlot(secDep);
+    const fe = (libre ? 1 : p) * (ETAGES.length - 1);
     altM = Math.min(altMax(), altitudeDe(fe));
-    const etage = libre ? "trou" : etageDe(secDep);
+    const etage = ETAGES[Math.min(ETAGES.length - 1, Math.floor(fe + .5))];
+    ARBRE_COSMOS = libre;
     const nuit = Math.min(1, Math.max(0, (fe - 2.25) / 1.15));
     const jour = 1 - nuit;
     const E = ech() * dpr;
@@ -3160,7 +3266,7 @@ function dessineNid(c, E, x, y, t, nuit) {
     /* ---- le trou noir ----
        Disque d'accrétion en rotation, anneau de photons, puis l'horizon : un
        vrai noir, dessiné en dernier pour qu'aucun additif ne le rattrape. */
-    const tn = Math.max(0, Math.min(1, (fe - 4.35) / .65));
+    const tn = libre ? 0 : Math.max(0, Math.min(1, (fe - 4.35) / .65));
     if (tn > .005){
       const R = Math.min(W, Hh) * (.055 + tn * .115);
       ctx.save();
@@ -3260,7 +3366,7 @@ function dessineNid(c, E, x, y, t, nuit) {
        Le sommet est fixe à l'écran, l'arbre s'allonge vers le bas et le sol
        s'éloigne. L'exposant retarde la pousse : la matinée se joue sur quelques
        centimètres de tige, l'après-midi sur des kilomètres de tronc. */
-    const tx = W * .17;
+    const tx = W * (libre ? .36 : .17);
     const CIME = Hh * .34, SOL0 = Hh * .74;
     const SPAN = Hh * 5.6;
     const haut = Math.max(15 * E, Math.pow(p, 1.25) * SPAN);
@@ -3269,6 +3375,8 @@ function dessineNid(c, E, x, y, t, nuit) {
     const solY = SOL0 + Math.max(0, haut - (SOL0 - CIME));
     const cimeY = solY - haut;
     const bas = Math.min(solY, Hh + 260 * E);
+
+    if (libre) dessineSysteme(tx, cimeY, t0, E, false);   // moitié d'orbite au fond
 
     // ---- le tronc, ses branches et son feuillage ----
     if (bas - cimeY < 72 * E){
@@ -3296,6 +3404,8 @@ function dessineNid(c, E, x, y, t, nuit) {
       dessineSol(ctx, E, W, Hh, solY, t0, nuit);
       if (aDebloque("tresor")) dessineNid(ctx, E, W * .74, solY - 6 * E, t0, nuit);
     }
+
+    if (libre) dessineSysteme(tx, cimeY, t0, E, true);    // et celle qui passe devant
 
     // ---- montgolfière ----
     if (aDebloque("boat") && fe > .8 && fe < 3.1){
@@ -3417,14 +3527,14 @@ function dessineNid(c, E, x, y, t, nuit) {
         q.rot += q.vr;
         if (q.y > Hh + 30 * E){ petales.splice(i, 1); continue; }
         ctx.save(); ctx.translate(q.x, q.y); ctx.rotate(q.rot);
-        ctx.fillStyle = "hsla(" + q.h + ",82%,84%,.9)";
-        ctx.beginPath(); ctx.ellipse(0, 0, q.r * E, q.r * .55 * E, 0, 0, 6.283); ctx.fill();
+        ctx.fillStyle = "rgba(236,232,255,.92)";
+        ctx.beginPath(); ctx.ellipse(0, 0, q.r * .5 * E, q.r * .16 * E, 0, 0, 6.283); ctx.fill();
         ctx.restore();
       }
       ctx.globalCompositeOperation = "lighter";
-      const fg = ctx.createRadialGradient(W * .5, Hh * .42, 0, W * .5, Hh * .42, Hh);
-      fg.addColorStop(0, "rgba(255,214,240,.22)");
-      fg.addColorStop(1, "rgba(255,214,240,0)");
+      const fg = ctx.createRadialGradient(tx, Hh * .34, 0, tx, Hh * .34, Hh);
+      fg.addColorStop(0, "rgba(158,120,255,.26)");
+      fg.addColorStop(1, "rgba(158,120,255,0)");
       ctx.fillStyle = fg; ctx.fillRect(0, 0, W, Hh);
       ctx.globalCompositeOperation = "source-over";
     } else if (petales.length) petales.length = 0;
