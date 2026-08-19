@@ -2555,14 +2555,83 @@ function dessineTronc(c, E, tx, cimeY, basY, t, nuit) {
 const BOUQUETS = { cle: "", tab: null };
 const BQ_TAILLE = 232, BQ_N = 6;
 let ARBRE_COSMOS = false;
-// une fois libéré, chaque feuille devient un morceau de ciel profond
-const RAMPE_COSMOS = [0x05030f, 0x0c0722, 0x18103c, 0x2a1a62, 0x46309c, 0x7a5ad8];
+
+/* ---- l'univers derrière les feuilles ----
+   Une seule grande texture de cosmos, révélée à travers la découpe du feuillage.
+   Peindre une nébuleuse dans chaque feuille donnait des confettis ; ici toute la
+   canopée est une fenêtre sur un même ciel. */
+let universSprite = null;
+function spriteUnivers() {
+  if (universSprite) return universSprite;
+  const S = 1024;
+  universSprite = document.createElement('canvas');
+  universSprite.width = universSprite.height = S;
+  const g = universSprite.getContext('2d');
+  const rnd = (i) => { const s = Math.sin(i * 12.9898 + 78.233) * 43758.5453; return s - Math.floor(s); };
+
+  g.fillStyle = '#030209';
+  g.fillRect(0, 0, S, S);
+
+  // nappes de gaz : chaque foyer est un amas de lobes décalés, un cercle net
+  // ne ressemblant à rien de céleste
+  g.globalCompositeOperation = 'lighter';
+  const FOYERS = [
+    [0.24, 0.30, 0.46, '190,70,240'], [0.72, 0.24, 0.40, '60,140,255'],
+    [0.58, 0.72, 0.50, '240,90,140'], [0.14, 0.78, 0.36, '70,220,215'],
+    [0.86, 0.62, 0.30, '255,170,80'], [0.44, 0.46, 0.34, '130,90,255']
+  ];
+  for (let q = 0; q < FOYERS.length; q++) {
+    const f = FOYERS[q];
+    for (let k = 0; k < 10; k++) {
+      const a = rnd(q * 40 + k) * 6.2832, d = rnd(q * 40 + k + 20) * f[2] * S * 0.5;
+      const x = f[0] * S + Math.cos(a) * d, y = f[1] * S + Math.sin(a) * d;
+      const r = f[2] * S * (0.26 + rnd(q * 40 + k + 40) * 0.44);
+      const ng = g.createRadialGradient(x, y, 0, x, y, r);
+      ng.addColorStop(0, 'rgba(' + f[3] + ',.22)');
+      ng.addColorStop(0.45, 'rgba(' + f[3] + ',.09)');
+      ng.addColorStop(1, 'rgba(' + f[3] + ',0)');
+      g.fillStyle = ng;
+      g.beginPath(); g.arc(x, y, r, 0, 6.2832); g.fill();
+    }
+  }
+
+  // poussière : des voiles sombres qui découpent les nappes
+  g.globalCompositeOperation = 'source-over';
+  for (let i = 0; i < 46; i++) {
+    const x = rnd(i + 900) * S, y = rnd(i + 940) * S;
+    const r = S * (0.04 + rnd(i + 980) * 0.11);
+    const dg = g.createRadialGradient(x, y, 0, x, y, r);
+    dg.addColorStop(0, 'rgba(4,2,10,.58)');
+    dg.addColorStop(1, 'rgba(4,2,10,0)');
+    g.fillStyle = dg;
+    g.beginPath(); g.arc(x, y, r, 0, 6.2832); g.fill();
+  }
+
+  g.globalCompositeOperation = 'lighter';
+  for (let i = 0; i < 9000; i++) {
+    const x = rnd(i + 2000) * S, y = rnd(i + 3000) * S, b = rnd(i + 4000);
+    g.fillStyle = 'rgba(' + ((214 + b * 41) | 0) + ',' + ((220 + b * 35) | 0)
+                + ',255,' + (0.30 + b * 0.68).toFixed(2) + ')';
+    g.beginPath(); g.arc(x, y, b * 1.5 + 0.45, 0, 6.2832); g.fill();
+  }
+  for (let i = 0; i < 240; i++) {               // les vives, avec leur halo
+    const x = rnd(i + 6000) * S, y = rnd(i + 6500) * S, r = 1.4 + rnd(i + 7000) * 2.4;
+    const hg = g.createRadialGradient(x, y, 0, x, y, r * 6);
+    hg.addColorStop(0, 'rgba(255,255,255,.95)');
+    hg.addColorStop(0.22, 'rgba(200,220,255,.30)');
+    hg.addColorStop(1, 'rgba(150,190,255,0)');
+    g.fillStyle = hg;
+    g.beginPath(); g.arc(x, y, r * 6, 0, 6.2832); g.fill();
+  }
+  g.globalCompositeOperation = 'source-over';
+  return universSprite;
+}
 
 function cuitBouquets(saison, nuitQ, cosmos) {
-  const cle = (cosmos ? "cosmos" : saison.nom) + "|" + nuitQ;
+  const cle = (cosmos ? 'cosmos' : saison.nom) + '|' + nuitQ;
   if (BOUQUETS.cle === cle) return BOUQUETS.tab;
-  const n = cosmos ? 0 : nuitQ / 10, k = n * 0.62;
-  const P = (cosmos ? RAMPE_COSMOS : saison.rampe).map((v) => [
+  const k = (cosmos ? 0 : nuitQ / 10) * 0.62;
+  const P = saison.rampe.map((v) => [
     ((((v >> 16) & 255) * (1 - k) + 14 * k) | 0),
     ((((v >> 8) & 255) * (1 - k) + 30 * k) | 0),
     (((v & 255) * (1 - k) + 48 * k) | 0)
@@ -2578,45 +2647,33 @@ function cuitBouquets(saison, nuitQ, cosmos) {
     const gr = (i) => { const s = Math.sin((i + v * 71.3) * 12.9898 + 78.233) * 43758.5453;
                         return s - Math.floor(s); };
 
-    /* Une feuille : limbe en amande, nervure centrale, et un reflet sur la
-       moitié tournée vers la lumière (haut-droite). */
-    function feuille(x, y, len, ang, ton) {
-      const w = len * 0.40;
-      g.save(); g.translate(x, y); g.rotate(ang);
+    // contour d'une feuille : limbe en amande, la transformation reste posée
+    function chemin(f) {
+      const w = f.len * 0.40;
+      g.save();
+      g.translate(f.x, f.y); g.rotate(f.ang);
       g.beginPath();
-      g.moveTo(-len * 0.5, 0);
-      g.quadraticCurveTo(-len * 0.1, -w, len * 0.5, 0);
-      g.quadraticCurveTo(-len * 0.1, w, -len * 0.5, 0);
+      g.moveTo(-f.len * 0.5, 0);
+      g.quadraticCurveTo(-f.len * 0.1, -w, f.len * 0.5, 0);
+      g.quadraticCurveTo(-f.len * 0.1, w, -f.len * 0.5, 0);
       g.closePath();
-      g.fillStyle = rgb(ton, 1); g.fill();
-      g.strokeStyle = rgb(Math.max(0, ton - 2), 0.5);
-      g.lineWidth = Math.max(0.5, len * 0.045); g.stroke();
+      return w;
+    }
+    function feuille(f) {
+      const w = chemin(f);
+      g.fillStyle = rgb(f.ton, 1); g.fill();
+      g.strokeStyle = rgb(Math.max(0, f.ton - 2), 0.5);
+      g.lineWidth = Math.max(0.5, f.len * 0.045); g.stroke();
       g.beginPath();                              // nervure
-      g.moveTo(-len * 0.42, 0); g.lineTo(len * 0.44, 0);
-      g.strokeStyle = rgb(Math.min(5, ton + 1), 0.42);
-      g.lineWidth = Math.max(0.5, len * 0.05); g.stroke();
+      g.moveTo(-f.len * 0.42, 0); g.lineTo(f.len * 0.44, 0);
+      g.strokeStyle = rgb(Math.min(5, f.ton + 1), 0.42);
+      g.lineWidth = Math.max(0.5, f.len * 0.05); g.stroke();
       g.beginPath();                              // reflet sur la face éclairée
-      g.moveTo(-len * 0.34, -w * 0.12);
-      g.quadraticCurveTo(-len * 0.05, -w * 0.72, len * 0.34, -w * 0.10);
-      g.quadraticCurveTo(-len * 0.05, -w * 0.30, -len * 0.34, -w * 0.12);
+      g.moveTo(-f.len * 0.34, -w * 0.12);
+      g.quadraticCurveTo(-f.len * 0.05, -w * 0.72, f.len * 0.34, -w * 0.10);
+      g.quadraticCurveTo(-f.len * 0.05, -w * 0.30, -f.len * 0.34, -w * 0.12);
       g.closePath();
-      g.fillStyle = rgb(Math.min(5, ton + 2), 0.34); g.fill();
-      if (cosmos) {
-        // la feuille est une fenêtre : nébuleuse au fond, étoiles par-dessus
-        const ng = g.createRadialGradient(len * .1, 0, 0, 0, 0, len * .55);
-        ng.addColorStop(0, "rgba(150,90,220,.34)");
-        ng.addColorStop(1, "rgba(40,20,90,0)");
-        g.fillStyle = ng;
-        g.beginPath(); g.ellipse(0, 0, len * .5, w * .95, 0, 0, 6.2832); g.fill();
-        for (let q = 0; q < 4; q++) {
-          const s1 = Math.abs(Math.sin((x + y + q) * 91.7)) % 1;
-          const s2 = Math.abs(Math.sin((x - y + q) * 47.3)) % 1;
-          g.fillStyle = "rgba(255,255,250," + (0.4 + s1 * 0.6).toFixed(2) + ")";
-          g.beginPath();
-          g.arc((s1 - .5) * len * .7, (s2 - .5) * w * 1.2, len * .035, 0, 6.2832);
-          g.fill();
-        }
-      }
+      g.fillStyle = rgb(Math.min(5, f.ton + 2), 0.34); g.fill();
       g.restore();
     }
 
@@ -2629,6 +2686,7 @@ function cuitBouquets(saison, nuitQ, cosmos) {
       { nb: 40, dx: 0.13, dy: -0.14, ray: 0.60, len: 0.255, tons: [3, 4] },
       { nb: 18, dx: 0.21, dy: -0.22, ray: 0.36, len: 0.235, tons: [4, 5] }
     ];
+    const paquet = [];
     let s = 0;
     for (const co of COUCHES) {
       for (let i = 0; i < co.nb; i++, s++) {
@@ -2642,24 +2700,52 @@ function cuitBouquets(saison, nuitQ, cosmos) {
         const dehors = Math.min(1, d / (R * co.ray + 0.001));
         const ang = a * dehors + (gr(s * 7.1 + 3) - 0.5) * (3.4 - dehors * 2.1);
         const ton = co.tons[(gr(s * 9.7 + 4) * co.tons.length) | 0];
-        feuille(x, y, len, ang, ton);
+        paquet.push({ x: x, y: y, len: len, ang: ang, ton: ton });
       }
     }
-    if (saison.fleurs) {
-      for (let i = 0; i < 16; i++) {
-        const a = gr(i * 11.3 + 900) * 6.2832;
-        const d = Math.sqrt(gr(i * 13.1 + 901)) * R * 0.9;
-        const x = m + Math.cos(a) * d, y = m + Math.sin(a) * d * 0.88;
-        const rr = R * (0.026 + gr(i + 902) * 0.018);
-        for (let q = 0; q < 5; q++) {
-          const aa = q * 1.2566 + gr(i + 903) * 3;
-          g.fillStyle = saison.fleurs;
-          g.beginPath();
-          g.ellipse(x + Math.cos(aa) * rr, y + Math.sin(aa) * rr, rr * 0.72, rr * 0.5, aa, 0, 6.2832);
-          g.fill();
+
+    if (cosmos) {
+      /* Le feuillage sert de pochoir. L'opacité du masque suit la couche :
+         les feuilles du fond laissent passer moins d'univers, ce qui rend la
+         profondeur sans avoir à les assombrir. */
+      for (const f of paquet) {
+        chemin(f);
+        g.fillStyle = 'rgba(255,255,255,' + (0.64 + f.ton * 0.072).toFixed(3) + ')';
+        g.fill();
+        g.restore();
+      }
+      g.globalCompositeOperation = 'source-in';
+      const U = spriteUnivers(), SW = 190;
+      g.drawImage(U, (v * 137) % (1024 - SW), (v * 251) % (1024 - SW), SW, SW, 0, 0, S, S);
+      g.globalCompositeOperation = 'source-over';
+      for (const f of paquet) {                  // nervure et bord, sinon ce n'est plus une feuille
+        chemin(f);
+        g.strokeStyle = 'rgba(46,28,86,.60)';   // un bord sombre sépare, un bord clair bave
+        g.lineWidth = Math.max(0.6, f.len * 0.05); g.stroke();
+        g.beginPath();
+        g.moveTo(-f.len * 0.40, 0); g.lineTo(f.len * 0.42, 0);
+        g.strokeStyle = 'rgba(214,196,255,.34)';
+        g.lineWidth = Math.max(0.5, f.len * 0.035); g.stroke();
+        g.restore();
+      }
+    } else {
+      for (const f of paquet) feuille(f);
+      if (saison.fleurs) {
+        for (let i = 0; i < 16; i++) {
+          const a = gr(i * 11.3 + 900) * 6.2832;
+          const d = Math.sqrt(gr(i * 13.1 + 901)) * R * 0.9;
+          const x = m + Math.cos(a) * d, y = m + Math.sin(a) * d * 0.88;
+          const rr = R * (0.026 + gr(i + 902) * 0.018);
+          for (let q = 0; q < 5; q++) {
+            const aa = q * 1.2566 + gr(i + 903) * 3;
+            g.fillStyle = saison.fleurs;
+            g.beginPath();
+            g.ellipse(x + Math.cos(aa) * rr, y + Math.sin(aa) * rr, rr * 0.72, rr * 0.5, aa, 0, 6.2832);
+            g.fill();
+          }
+          g.fillStyle = 'rgba(255,238,170,.95)';
+          g.beginPath(); g.arc(x, y, rr * 0.42, 0, 6.2832); g.fill();
         }
-        g.fillStyle = 'rgba(255,238,170,.95)';
-        g.beginPath(); g.arc(x, y, rr * 0.42, 0, 6.2832); g.fill();
       }
     }
     tab.push(cv);
@@ -3366,7 +3452,7 @@ function dessineNid(c, E, x, y, t, nuit) {
        Le sommet est fixe à l'écran, l'arbre s'allonge vers le bas et le sol
        s'éloigne. L'exposant retarde la pousse : la matinée se joue sur quelques
        centimètres de tige, l'après-midi sur des kilomètres de tronc. */
-    const tx = W * (libre ? .36 : .17);
+    const tx = W * (libre ? .5 : .17);
     const CIME = Hh * .34, SOL0 = Hh * .74;
     const SPAN = Hh * 5.6;
     const haut = Math.max(15 * E, Math.pow(p, 1.25) * SPAN);
