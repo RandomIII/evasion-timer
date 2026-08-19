@@ -1951,26 +1951,38 @@
   }
 
   /* ---- le système solaire de la libération ----
-     Une fois la journée finie, l'arbre n'est plus dans le monde : il EST le
-     monde, et les planètes lui tournent autour. La moitié d'orbite qui passe
-     derrière est tracée avant le tronc, l'autre après — sans ça, tout flotte
-     devant l'arbre et la profondeur disparaît. */
+     Chaque orbite est un cercle incliné, projeté en perspective : le demi-tour
+     proche passe devant l'arbre et grossit, le lointain passe derrière et
+     rétrécit. Une ellipse symétrique tracée d'un bloc ne pouvait rien dire de
+     tout ça — ni les rails ni les planètes n'avaient de profondeur. */
   const PLANETES = [
-    { r:0.60, t:6.5,  d:0.044, c:["#C9C4BA", "#6E6A63"] },
-    { r:0.92, t:11,   d:0.066, c:["#F2D9A0", "#A8873F"] },
-    { r:1.28, t:17,   d:0.070, c:["#7FB6E8", "#1E4C86"], lune:true },
-    { r:1.68, t:26,   d:0.058, c:["#E08A5A", "#8C3E20"] },
-    { r:2.22, t:44,   d:0.125, c:["#DCBA8E", "#8A6438"], bandes:true },
-    { r:2.76, t:66,   d:0.110, c:["#EBD8A6", "#A88C4C"], anneau:true },
-    { r:3.20, t:92,   d:0.082, c:["#A8E4E0", "#3C7E86"] },
-    { r:3.58, t:124,  d:0.078, c:["#7FA0E8", "#2C3F86"] }
+    { r:0.60, t:6.5,  d:0.046, c:["#C9C4BA", "#6E6A63"] },
+    { r:0.92, t:11,   d:0.070, c:["#F2D9A0", "#A8873F"] },
+    { r:1.28, t:17,   d:0.074, c:["#7FB6E8", "#1E4C86"], lune:true },
+    { r:1.68, t:26,   d:0.061, c:["#E08A5A", "#8C3E20"] },
+    { r:2.22, t:44,   d:0.132, c:["#DCBA8E", "#8A6438"], bandes:true },
+    { r:2.76, t:66,   d:0.116, c:["#EBD8A6", "#A88C4C"], anneau:true },
+    { r:3.20, t:92,   d:0.086, c:["#A8E4E0", "#3C7E86"] },
+    { r:3.58, t:124,  d:0.082, c:["#7FA0E8", "#2C3F86"] }
   ];
-  const APLAT = 0.34;                        // le plan des orbites vu presque par la tranche
+  const INCL = 1.224;                        // ~70° : le plan vu d'assez haut
+  const CI = Math.cos(INCL), SI = Math.sin(INCL);
+  const CAM = 9;                             // distance caméra, en rayons d'orbite
+
+  /* Cercle incliné puis projeté. sin(θ) > 0 : le point est du côté caméra, donc
+     sous le centre à l'écran et devant l'arbre. */
+  function projOrbite(r, th){
+    const s = Math.sin(th);
+    const z = r * s * SI;
+    const k = CAM / (CAM - z);
+    return { x: r * Math.cos(th) * k, y: r * s * CI * k, k: k };
+  }
 
   function dessineSysteme(cx, cy, t, E, devant){
     const U = Math.min(W, Hh) * 0.158;
     ctx.save();
     ctx.translate(cx, cy);
+
     if (!devant){
       // l'arbre est l'astre de ce système : c'est de lui que vient la lumière
       ctx.save();
@@ -1982,23 +1994,33 @@
       ctx.fillStyle = ag;
       ctx.beginPath(); ctx.arc(0, 0, U * 1.3, 0, 6.2832); ctx.fill();
       ctx.restore();
-      for (const pl of PLANETES){            // les rails, une seule fois, au fond
-        ctx.strokeStyle = "rgba(168,196,255," + (0.24 + 0.07 * Math.sin(t * .5 + pl.r)) + ")";
-        ctx.lineWidth = Math.max(1.2, E * 1.2);
-        ctx.beginPath();
-        ctx.ellipse(0, 0, pl.r * U, pl.r * U * APLAT, 0, 0, 6.2832);
-        ctx.stroke();
-      }
     }
+
+    // le rail, coupé en deux : moitié lointaine au fond, moitié proche devant
+    const N = 40, dep = devant ? 0 : Math.PI;
     for (const pl of PLANETES){
-      const a = t * 6.2832 / pl.t + pl.r * 2.7;
-      const sy = Math.sin(a);
-      // sin > 0 : la planète est du côté proche, donc devant l'arbre
-      if ((sy > 0) !== devant) continue;
-      const x = Math.cos(a) * pl.r * U, y = sy * pl.r * U * APLAT;
-      const rr = pl.d * U * (0.82 + sy * 0.18);   // un peu plus grosse quand elle approche
+      ctx.beginPath();
+      for (let i = 0; i <= N; i++){
+        const p = projOrbite(pl.r, dep + Math.PI * (i / N));
+        const x = p.x * U, y = p.y * U;
+        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      }
+      ctx.strokeStyle = devant ? "rgba(198,220,255,.34)" : "rgba(112,140,208,.15)";
+      ctx.lineWidth = Math.max(1, E * (devant ? 1.5 : 1));
+      ctx.stroke();
+    }
+
+    for (const pl of PLANETES){
+      const th = t * 6.2832 / pl.t + pl.r * 2.7;
+      const s = Math.sin(th);
+      if ((s > 0) !== devant) continue;
+      const p = projOrbite(pl.r, th);
+      const rr = pl.d * U * p.k;
+      // ce qui s'éloigne perd de l'éclat : c'est la moitié du sentiment de relief
+      const lum = 0.50 + 0.50 * Math.max(0, Math.min(1, (p.k - 0.72) / 0.88));
       ctx.save();
-      ctx.translate(x, y);
+      ctx.translate(p.x * U, p.y * U);
+      ctx.globalAlpha = 0.55 + lum * 0.45;
       if (pl.anneau){                        // l'anneau passe derrière avant la boule
         ctx.strokeStyle = "rgba(226,208,160,.55)";
         ctx.lineWidth = rr * .30;
@@ -2007,7 +2029,7 @@
       ctx.save();
       ctx.globalCompositeOperation = "lighter";
       const hg = ctx.createRadialGradient(0, 0, rr * .8, 0, 0, rr * 2.6);
-      hg.addColorStop(0, pl.c[0] + "66");
+      hg.addColorStop(0, pl.c[0] + (lum > .8 ? "66" : "33"));
       hg.addColorStop(1, "rgba(0,0,0,0)");
       ctx.fillStyle = hg;
       ctx.beginPath(); ctx.arc(0, 0, rr * 2.6, 0, 6.2832); ctx.fill();
@@ -2039,7 +2061,7 @@
       }
       // croissant d'ombre : la lumière vient de l'arbre, au centre
       ctx.globalCompositeOperation = "source-atop";
-      const og = ctx.createRadialGradient(x * .04, y * .04, rr * .2, 0, 0, rr * 1.5);
+      const og = ctx.createRadialGradient(-p.x * U * .03, -p.y * U * .03, rr * .2, 0, 0, rr * 1.5);
       og.addColorStop(0, "rgba(0,0,0,0)");
       og.addColorStop(1, "rgba(2,2,10,.55)");
       ctx.fillStyle = og;
@@ -2047,6 +2069,7 @@
       ctx.globalCompositeOperation = "source-over";
       ctx.restore();
     }
+    ctx.globalAlpha = 1;
     ctx.restore();
   }
 
