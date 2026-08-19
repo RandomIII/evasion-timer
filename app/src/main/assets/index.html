@@ -2240,7 +2240,7 @@ function dessineTronc(c, E, tx, cimeY, basY, t, nuit) {
     courbe(a, false); courbe(b, false); c.closePath();
   }
 
-  const ancres = [{ x: ax[0], y: cimeY - 4 * E, taille: 58 * E, cote: 0 }];
+  const ancres = [{ x: ax[0], y: cimeY - 4 * E, taille: 58 * E, cote: 0, graine: 1 }];
   // la cime doit être un bourgeon arrondi : une coupe nette ferait un piquet scié
   const bourgeon = () => {
     c.beginPath();
@@ -2293,20 +2293,27 @@ function dessineTronc(c, E, tx, cimeY, basY, t, nuit) {
     const u = 0.30 + cyl((Math.cos(ang) * cote + 1) / 2) * 0.5 + (cote > 0 ? 0.14 : 0);
     ruban(x, y, cx, cy, ex, ey, w, w * 0.6, u);
     if (reste <= 0 || w < 1.5 * E) {
-      ancres.push({ x: ex, y: ey, taille: Math.max(38 * E, w * 16), cote: cote });
+      ancres.push({ x: ex, y: ey, taille: Math.max(38 * E, w * 16), cote: cote, graine: sem });
       return;
+    }
+    /* Bouquets le long de la branche, pas seulement au bout : une couronne
+       n'est pas une guirlande de pompons posés aux extrémités. */
+    if (reste <= 2) {
+      const mx = 0.25 * x + 0.5 * cx + 0.25 * ex, my = 0.25 * y + 0.5 * cy + 0.25 * ey;
+      ancres.push({ x: mx, y: my, taille: Math.max(30 * E, w * 11), cote: cote,
+                    graine: sem + 0.5 });
     }
     const ouv = 0.34 + alea(sem + 1) * 0.26;
     ramifie(ex, ey, ang - ouv, len * (0.70 + alea(sem + 2) * 0.10),
             w * 0.64, reste - 1, cote, sem * 3 + 7);
     ramifie(ex, ey, ang + ouv * (0.7 + alea(sem + 3) * 0.6),
             len * (0.60 + alea(sem + 4) * 0.14), w * 0.56, reste - 1, cote, sem * 3 + 11);
-    if (alea(sem + 5) > 0.72)                    // gourmand occasionnel, brise la symétrie
+    if (alea(sem + 5) > 0.60)                    // gourmand occasionnel, brise la symétrie
       ramifie(ex, ey, ang + (alea(sem + 6) - 0.5) * 0.4, len * 0.44,
               w * 0.34, reste - 2, cote, sem * 3 + 13);
   }
 
-  const NB = Math.max(3, Math.min(7, Math.round(H / (240 * E))));
+  const NB = Math.max(3, Math.min(9, Math.round(H / (185 * E))));
   for (let i = 0; i < NB; i++) {
     const q = NB > 1 ? i / (NB - 1) : 0.5;
     const p = 0.10 + 0.72 * q + (alea(i + 5) - 0.5) * 0.06;
@@ -2509,14 +2516,18 @@ function dessineFeuillage(c, E, x, y, taille, graine, t, nuit) {
   if (!(R > 1)) return;
   const nq = Math.round(Math.min(1, Math.max(0, nuit || 0)) * 10);
   const tab = cuitBouquets(SAISON, nq);
-  const g = Math.abs(graine);
-  const sp = tab[((g * 7.3) | 0) % BQ_N];
-  const ph = g * 2.3999;
-  const d = R * 2.35;
+  /* Le hachage vient de la graine de l'ancre, jamais de sa position : celle-ci
+     dérive avec le balancement, et la variante de sprite changeait à chaque
+     frame — le bouquet clignotait d'une texture à l'autre. */
+  const h1 = Math.abs(Math.sin(graine * 12.9898) * 43758.5453) % 1;
+  const h2 = Math.abs(Math.sin(graine * 78.233 + 4.1) * 24634.6345) % 1;
+  const sp = tab[((h1 * BQ_N) | 0) % BQ_N];
+  const ph = h2 * 6.2832;
+  const d = R * 2.35 * (0.86 + h2 * 0.30);
   c.save();
   c.translate(x + Math.sin(t * 0.83 + ph) * R * 0.035,
               y + Math.cos(t * 0.61 + ph * 1.7) * R * 0.022);
-  c.rotate(((g * 3.7) % 1 - 0.5) * 0.8 + Math.sin(t * 0.47 + ph) * 0.022);
+  c.rotate((h2 - 0.5) * 1.4 + Math.sin(t * 0.47 + ph) * 0.022);
   const resp = 1 + Math.sin(t * 0.53 + ph) * 0.014;
   c.drawImage(sp, -d * resp / 2, -d * resp / 2, d * resp, d * resp);
   c.restore();
@@ -3223,7 +3234,7 @@ function dessineNid(c, E, x, y, t, nuit) {
           if (an.cote === 0) continue;
           if (dens < .99 && ((k++ * .618) % 1) > dens) continue;
           dessineFeuillage(ctx, E, an.x, an.y, an.taille / E * (.78 + dens * .3),
-                           an.x * .07 + an.y * .013, t0, nuit);
+                           an.graine, t0, nuit);
         }
         // la couronne suit l'axe réel du fût, qui serpente et se balance
         dessineCouronne(ctx, E, ancres[0].x, ancres[0].y,
