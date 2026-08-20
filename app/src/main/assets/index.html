@@ -1853,6 +1853,10 @@
 
   const etoiles = [], nuees = [], feuilles = [], oiseaux = [], petales = [],
         pollen = [], flocons = [];
+  /* Phase propre à l'arbre : près du trou noir tout s'emballe. On intègre le
+     temps au lieu de multiplier t0, sinon la moindre variation du facteur
+     ferait sauter l'animation d'un bout à l'autre de son cycle. */
+  let phArbre = 0, tArbrePrec = 0, rushArbre = 1;
   let arbrePret = false, altM = 0;
   function initArbre(){
     if (arbrePret) return;
@@ -3252,9 +3256,15 @@ function dessineNid(c, E, x, y, t, nuit) {
         const u = i / (NL - 1);
         // cloche : les lobes du centre montent plus haut que ceux des extrémités
         const cloche = Math.pow(Math.sin(u * Math.PI), .62);
-        const r = NU_H * (.13 + .29 * cloche) * (.78 + rnd(i) * .44);
-        lobes.push({ x: NU_W * (.10 + .80 * u) + (rnd(i + 20) - .5) * NU_W * .04,
-                     y: base - r * (.90 + rnd(i + 40) * .16), r: r });
+        const r = NU_H * (.13 + .27 * cloche) * (.78 + rnd(i) * .40);
+        /* Les passes décalent les lobes de .76 r vers la gauche et .94 r vers le
+           haut : sans cette marge, le nuage sortait du sprite et se retrouvait
+           coupé net par le bord du canvas. */
+        const marge = r * 1.05 + 6;
+        const x = Math.max(marge, Math.min(NU_W - marge,
+                  NU_W * (.10 + .80 * u) + (rnd(i + 20) - .5) * NU_W * .04));
+        const y = Math.max(marge, base - r * (.90 + rnd(i + 40) * .16));
+        lobes.push({ x: x, y: y, r: r });
       }
       // passe : dessine tous les lobes décalés d'un vecteur, dans une teinte
       const passe = (dx, dy, ech, col, bord) => {
@@ -3381,71 +3391,126 @@ function dessineNid(c, E, x, y, t, nuit) {
       ctx.restore();
     }
 
-    /* ---- le trou noir ----
-       Disque d'accrétion en rotation, anneau de photons, puis l'horizon : un
-       vrai noir, dessiné en dernier pour qu'aucun additif ne le rattrape. */
+    /* ---- Gargantua ----
+       La lumière du disque contourne l'astre : on voit son arrière ramené
+       au-dessus ET au-dessous de l'ombre, d'où l'anneau complet. Le disque plat
+       repasse ensuite devant le bas de l'ombre. C'est cet ordre-là qui fait
+       la silhouette, pas la couleur. */
     const tn = libre ? 0 : Math.max(0, Math.min(1, (fe - 4.35) / .65));
     if (tn > .005){
       const R = Math.min(W, Hh) * (.055 + tn * .115);
+      const tour = t0 * .32;
       ctx.save();
       ctx.translate(W * .5, Hh * .30);
       ctx.globalAlpha = tn;
       ctx.globalCompositeOperation = "lighter";
-      for (const sens of [1, -1]){                   // l'arc de lentille, au-dessus et au-dessous
+
+      // halo général : la lueur qui déborde bien au-delà du disque
+      const bl = ctx.createRadialGradient(0, 0, R * .9, 0, 0, R * 6);
+      bl.addColorStop(0,   "rgba(255,182,96,.26)");
+      bl.addColorStop(.30, "rgba(255,132,48,.09)");
+      bl.addColorStop(1,   "rgba(170,54,10,0)");
+      ctx.fillStyle = bl;
+      ctx.beginPath(); ctx.arc(0, 0, R * 6, 0, 6.283); ctx.fill();
+
+      // la nappe du disque : un fondu très aplati, sous les filaments
+      function nappe(){
         ctx.save();
-        ctx.scale(1, sens);
-        const ag = ctx.createLinearGradient(-R * 3, 0, R * 3, 0);
-        ag.addColorStop(0,   "rgba(255,146,54,0)");
-        ag.addColorStop(.28, "rgba(255,182,86,.50)");
-        ag.addColorStop(.5,  "rgba(255,244,214,.85)");
-        ag.addColorStop(.72, "rgba(255,168,72,.50)");
-        ag.addColorStop(1,   "rgba(255,146,54,0)");
-        ctx.strokeStyle = ag; ctx.lineWidth = R * .13;
-        ctx.beginPath(); ctx.arc(0, 0, R * 1.30, Math.PI * 1.02, Math.PI * 1.98); ctx.stroke();
+        ctx.scale(1, .125);
+        const np = ctx.createRadialGradient(0, 0, R * 1.02, 0, 0, R * 4.4);
+        np.addColorStop(0,   "rgba(255,240,206,.90)");
+        np.addColorStop(.14, "rgba(255,196,116,.58)");
+        np.addColorStop(.46, "rgba(255,134,46,.26)");
+        np.addColorStop(1,   "rgba(146,40,6,0)");
+        ctx.fillStyle = np;
+        ctx.beginPath(); ctx.arc(0, 0, R * 4.4, 0, 6.283); ctx.fill();
         ctx.restore();
       }
-      // nappe du disque : un fondu large avant les filaments, sinon les traits
-      // se lisent comme les spires d'un ressort
-      const nap = ctx.createRadialGradient(0, 0, R * 1.1, 0, 0, R * 3.3);
-      nap.addColorStop(0,   "rgba(255,214,150,.55)");
-      nap.addColorStop(.35, "rgba(255,150,60,.30)");
-      nap.addColorStop(1,   "rgba(190,60,20,0)");
-      ctx.save();
-      ctx.scale(1, .17); ctx.fillStyle = nap;
-      ctx.beginPath(); ctx.arc(0, 0, R * 3.3, 0, 6.283); ctx.fill();
-      ctx.restore();
-      for (let i = 0; i < 60; i++){                  // filaments emportés par la rotation
-        const u = i / 59;
-        const rr = R * (1.18 + u * 2.1);
-        const vit = t0 * (1.5 - u * .95) + i * 2.399;
-        const a0 = vit % 6.283, arc = 1.1 + u * 1.5;
-        const chaud = 1 - u;
-        // le côté qui vient vers nous est plus vif : décalage Doppler
-        const dop = .5 + .5 * Math.cos(a0 + arc * .5 + Math.PI);
-        const al = (.30 - u * .22) * (.25 + dop * .95);
-        ctx.strokeStyle = "rgba(255," + Math.round(126 + chaud * 128) + ","
-                        + Math.round(34 + chaud * 152) + "," + al.toFixed(3) + ")";
-        ctx.lineWidth = R * (.055 - u * .028);
-        ctx.beginPath();
-        ctx.ellipse(0, 0, rr, rr * .17, 0, a0, a0 + arc);
-        ctx.stroke();
+      /* Filaments : le gaz s'enroule, d'autant plus vite qu'il est proche.
+         `devant` ne garde que la portion d'angle qui passe sous le centre —
+         découper au rectangle laissait une arête horizontale en travers. */
+      function filaments(devant){
+        for (let i = 0; i < 54; i++){
+          const u = i / 53;
+          const rr = R * (1.05 + u * 3.2);
+          const sq = .105 + u * .05;
+          const a0 = (tour * (1.9 - u * 1.35) + i * 2.399) % 6.283;
+          const arc = 1.3 + u * 2.0;
+          const chaud = 1 - u;
+          // le gaz qui vient vers nous est bleui et plus vif : effet Doppler
+          const dop = .34 + .66 * (.5 - .5 * Math.cos(a0 + arc * .5));
+          const al = (.36 - u * .29) * dop;
+          if (al <= 0) continue;
+          ctx.strokeStyle = "rgba(255," + Math.round(148 + chaud * 106) + ","
+                          + Math.round(50 + chaud * 152) + "," + al.toFixed(3) + ")";
+          ctx.lineWidth = R * (.075 - u * .05);
+          if (!devant){
+            ctx.beginPath();
+            ctx.ellipse(0, 0, rr, rr * sq, 0, a0, a0 + arc);
+            ctx.stroke();
+            continue;
+          }
+          for (const dec of [0, -6.2832, 6.2832]){   // l'arc peut enjamber le tour
+            const d0 = Math.max(a0 + dec, .05), d1 = Math.min(a0 + arc + dec, 3.0916);
+            if (d1 <= d0) continue;
+            ctx.beginPath();
+            ctx.ellipse(0, 0, rr, rr * sq, 0, d0, d1);
+            ctx.stroke();
+          }
+        }
       }
-      const pg = ctx.createRadialGradient(0, 0, R * .98, 0, 0, R * 1.28);
-      pg.addColorStop(0,   "rgba(255,238,206,0)");
-      pg.addColorStop(.42, "rgba(255,246,226,.95)");   // anneau de photons
-      pg.addColorStop(1,   "rgba(255,196,120,0)");
-      ctx.fillStyle = pg;
-      ctx.beginPath(); ctx.arc(0, 0, R * 1.28, 0, 6.283); ctx.fill();
+
+      /* l'anneau d'Einstein : l'arrière du disque, replié tout autour de
+         l'ombre. C'est lui qui distingue un trou noir d'un simple astre. */
+      const ha = ctx.createRadialGradient(0, 0, R * 1.0, 0, 0, R * 2.05);
+      ha.addColorStop(0,   "rgba(255,248,222,0)");
+      ha.addColorStop(.09, "rgba(255,242,206,.92)");
+      ha.addColorStop(.26, "rgba(255,196,118,.44)");
+      ha.addColorStop(.62, "rgba(255,142,60,.15)");
+      ha.addColorStop(1,   "rgba(255,120,40,0)");
+      ctx.fillStyle = ha;
+      ctx.beginPath(); ctx.arc(0, 0, R * 2.05, 0, 6.283); ctx.fill();
+
+      nappe(); filaments(false);
+
+      // dissymétrie Doppler : le côté qui approche écrase l'autre en éclat
+      const dp = ctx.createLinearGradient(-R * 4.4, 0, R * 4.4, 0);
+      dp.addColorStop(0,   "rgba(255,246,226,.34)");
+      dp.addColorStop(.34, "rgba(255,216,166,.08)");
+      dp.addColorStop(1,   "rgba(255,120,40,0)");
+      ctx.save();
+      ctx.scale(1, .16); ctx.fillStyle = dp;
+      ctx.beginPath(); ctx.arc(0, 0, R * 4.4, 0, 6.283); ctx.fill();
+      ctx.restore();
+
+      // l'horizon : un noir franc, posé sur tout ce qui précède
       ctx.globalCompositeOperation = "source-over";
-      const eg = ctx.createRadialGradient(0, 0, R * .82, 0, 0, R * 1.06);
-      eg.addColorStop(0, "rgba(0,0,0,1)");
-      eg.addColorStop(1, "rgba(0,0,0,0)");
-      ctx.fillStyle = eg; ctx.beginPath(); ctx.arc(0, 0, R * 1.06, 0, 6.283); ctx.fill();
       ctx.fillStyle = "#000";
-      ctx.beginPath(); ctx.arc(0, 0, R * .84, 0, 6.283); ctx.fill();
+      ctx.beginPath(); ctx.arc(0, 0, R, 0, 6.283); ctx.fill();
+
+      // l'anneau de photons, fin et presque blanc, avec son propre halo
+      ctx.globalCompositeOperation = "lighter";
+      ctx.strokeStyle = "rgba(255,238,204,.20)";
+      ctx.lineWidth = R * .11;
+      ctx.beginPath(); ctx.arc(0, 0, R * 1.035, 0, 6.283); ctx.stroke();
+      const pr = ctx.createLinearGradient(-R, 0, R, 0);
+      pr.addColorStop(0,  "rgba(255,253,244,1)");
+      pr.addColorStop(.5, "rgba(255,240,210,.80)");
+      pr.addColorStop(1,  "rgba(255,216,152,.52)");
+      ctx.strokeStyle = pr; ctx.lineWidth = R * .026;
+      ctx.beginPath(); ctx.arc(0, 0, R * 1.012, 0, 6.283); ctx.stroke();
+
+      // le devant du disque repasse par-dessus le bas de l'ombre
+      filaments(true);
+
       ctx.restore();
       ctx.globalAlpha = 1;
     }
+
+    const dtA = tArbrePrec ? Math.min(.12, t0 - tArbrePrec) : 0;
+    tArbrePrec = t0;
+    rushArbre = 1 + tn * 7;
+    phArbre += dtA * rushArbre;
 
     // ---- nuages : bouffées douces, en parallaxe, cantonnées à leur étage ----
     const bandeN = Math.max(0, Math.min(1, (fe - .35) / .85))
@@ -3503,12 +3568,12 @@ function dessineNid(c, E, x, y, t, nuit) {
     const fondu = Math.max(0, Math.min(1, (HT - 62 * E) / (42 * E)));
     if (fondu < 1){
       ctx.globalAlpha = 1 - fondu;
-      dessinePousse(ctx, E, tx, cimeY, bas, t0, nuit);
+      dessinePousse(ctx, E, tx, cimeY, bas, phArbre, nuit);
       ctx.globalAlpha = 1;
     }
     if (fondu > 0){
       ctx.globalAlpha = fondu;
-      const ancres = dessineTronc(ctx, E, tx, cimeY, bas, t0, nuit);
+      const ancres = dessineTronc(ctx, E, tx, cimeY, bas, phArbre, nuit);
       // la saison éclaircit la ramure : en hiver il ne reste presque rien
       const dens = SAISON.densite;
       if (aDebloque("algues")){
@@ -3517,12 +3582,12 @@ function dessineNid(c, E, x, y, t, nuit) {
           if (an.cote === 0) continue;
           if (dens < .99 && ((k++ * .618) % 1) > dens) continue;
           dessineFeuillage(ctx, E, an.x, an.y, an.taille / E * (.78 + dens * .3),
-                           an.graine, t0, nuit);
+                           an.graine, phArbre, nuit);
         }
         // la couronne suit l'axe réel du fût, qui serpente et se balance
         dessineCouronne(ctx, E, ancres[0].x, ancres[0].y,
                         86 * (.66 + dens * .34) * Math.min(1, HT / (420 * E)),
-                        t0, nuit);
+                        phArbre, nuit);
       }
       ctx.globalAlpha = 1;
     }
@@ -3582,7 +3647,7 @@ function dessineNid(c, E, x, y, t, nuit) {
       const S = SAISON;
       if (S.neige){
         for (const f of flocons){
-          f.y += f.v * lent * E * .9;
+          f.y += f.v * lent * rushArbre * E * .9;
           f.x += Math.sin(f.y * .014 + f.ph) * 1.1 * E;
           if (f.y > Hh + 8 * E){ f.y = -8 * E; f.x = Math.random() * W; }
           ctx.fillStyle = "rgba(244,250,255," + (chute * (f.br ? .92 : .55)) + ")";
@@ -3591,7 +3656,7 @@ function dessineNid(c, E, x, y, t, nuit) {
       } else {
         const k = nuit * .62;
         for (const f of feuilles){
-          f.y += f.v * lent * E * .8;
+          f.y += f.v * lent * rushArbre * E * .8;
           f.x += Math.sin(f.y * .02 + f.rot) * .8 * E;
           f.rot += f.vr;
           if (f.y > Hh + 20 * E){ f.y = -20 * E; f.x = Math.random() * W; }
@@ -5038,15 +5103,18 @@ function dessineNid(c, E, x, y, t, nuit) {
 
     // phase de la journée (pause : réglable ET débloquée dans l'arbre)
     const pauseOn = horaires.pause && aDebloque("lunch");
-    if (now < A.debut)                phase = "avant";
+    /* Le départ est testé EN PREMIER. Placé en dernier, il était inatteignable
+       dès que l'heure de départ tombait avant le déjeuner : l'échelle s'arrêtait
+       sur « matin », LIBRE n'arrivait jamais et le compteur repartait vers le haut. */
+    if (now >= A.dep)                 phase = "libre";
+    else if (now < A.debut)           phase = "avant";
     else if (pauseOn && now < A.dej)  phase = "matin";
     else if (pauseOn && now < A.rep)  phase = "pause";
-    else if (now < A.dep)             phase = pauseOn ? "aprem" : "jour";
-    else                              phase = "libre";
+    else                              phase = pauseOn ? "aprem" : "jour";
 
     const enPause = phase === "pause";
-    // pendant la pause, le compte à rebours vise la reprise ; sinon, le départ
-    const cibleUs = (enPause ? A.rep : A.dep) * 1000;
+    // pendant la pause on vise la reprise, sans jamais dépasser le départ
+    const cibleUs = (enPause ? Math.min(A.rep, A.dep) : A.dep) * 1000;
     const rem = cibleUs - t, over = rem < 0, abs = Math.abs(rem);
 
     // Affichage arrondi AU-DESSUS jusqu'à la plus petite unité débloquée : sinon, avec
