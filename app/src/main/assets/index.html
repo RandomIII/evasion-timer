@@ -2337,6 +2337,10 @@ function dessineTronc(c, E, tx, cimeY, basY, t, nuit) {
   const DEMI_BAS = Math.min(96 * E, Math.max(3.5 * E, H * 0.098));
   const DEMI_CIME = Math.max(1.6 * E, DEMI_BAS * 0.15);
   const PAS = 26, PAS_T = 14;          // texture : moitié moins de points, invisible à l'œil
+  /* Tout ce qui s'écarte de l'axe se mesure à la hauteur du fût. En absolu, un
+     tronc de soixante-dix pixels portait des branches de cent soixante-dix et
+     gondolait de quarante-six : l'arbre naissait énorme et tordu. */
+  const jeune = Math.min(1, Math.pow(H / (420 * E), 0.75));
   const AMPL = 0.9 * DEMI_BAS;
   const balance = Math.sin(t * 0.29) * 0.7 + Math.sin(t * 0.131 + 1.1) * 0.3;
 
@@ -2349,9 +2353,10 @@ function dessineTronc(c, E, tx, cimeY, basY, t, nuit) {
   }
   function axe(y) {
     const p = prof(y);
-    const serpent = Math.sin(p * 3.9 + 0.7) * 46 * E * (1 - 0.45 * p)
-                  + Math.sin(p * 9.3 + 2.1) * 15 * E * (1 - 0.4 * p)
-                  + Math.sin(p * 19.1) * 5 * E;
+    const ampl = 0.34 + 0.66 * jeune;       // le jeune fût est presque droit
+    const serpent = (Math.sin(p * 3.9 + 0.7) * 46 * E * (1 - 0.45 * p)
+                  +  Math.sin(p * 9.3 + 2.1) * 15 * E * (1 - 0.4 * p)
+                  +  Math.sin(p * 19.1) * 5 * E) * ampl;
     return tx + serpent + balance * AMPL * (1 - p) * (1 - p);   // le pied est ancré
   }
 
@@ -2386,7 +2391,8 @@ function dessineTronc(c, E, tx, cimeY, basY, t, nuit) {
     courbe(a, false); courbe(b, false); c.closePath();
   }
 
-  const ancres = [{ x: ax[0], y: cimeY - 4 * E, taille: 58 * E, cote: 0, graine: 1 }];
+  const ancres = [{ x: ax[0], y: cimeY - 4 * E, taille: 58 * E * jeune,
+                    cote: 0, graine: 1 }];
   // la cime doit être un bourgeon arrondi : une coupe nette ferait un piquet scié
   const bourgeon = () => {
     c.beginPath();
@@ -2454,15 +2460,16 @@ function dessineTronc(c, E, tx, cimeY, basY, t, nuit) {
     const u = 0.30 + cyl((Math.cos(ang) * cote + 1) / 2) * 0.5 + (cote > 0 ? 0.14 : 0);
     ruban(x, y, cx, cy, ex, ey, w, w * 0.6, u);
     if (reste <= 0 || w < 1.5 * E) {
-      ancres.push({ x: ex, y: ey, taille: Math.max(38 * E, w * 16), cote: cote, graine: sem });
+      ancres.push({ x: ex, y: ey, taille: Math.max(38 * E * jeune, w * 16),
+                    cote: cote, graine: sem });
       return;
     }
     /* Bouquets le long de la branche, pas seulement au bout : une couronne
        n'est pas une guirlande de pompons posés aux extrémités. */
     if (reste <= 2) {
       const mx = 0.25 * x + 0.5 * cx + 0.25 * ex, my = 0.25 * y + 0.5 * cy + 0.25 * ey;
-      ancres.push({ x: mx, y: my, taille: Math.max(30 * E, w * 11), cote: cote,
-                    graine: sem + 0.5 });
+      ancres.push({ x: mx, y: my, taille: Math.max(30 * E * jeune, w * 11),
+                    cote: cote, graine: sem + 0.5 });
     }
     const ouv = 0.34 + alea(sem + 1) * 0.26;
     ramifie(ex, ey, ang - ouv, len * (0.70 + alea(sem + 2) * 0.10),
@@ -2474,19 +2481,21 @@ function dessineTronc(c, E, tx, cimeY, basY, t, nuit) {
               w * 0.34, reste - 2, cote, sem * 3 + 13);
   }
 
-  const NB = Math.max(3, Math.min(9, Math.round(H / (185 * E))));
+  // un jeune arbre n'a pas encore de charpentières : une ou deux suffisent
+  const NB = Math.max(1, Math.min(9, Math.round(H / (135 * E))));
+  const NIV = H > 300 * E ? 3 : H > 150 * E ? 2 : 1;
   for (let i = 0; i < NB; i++) {
     const q = NB > 1 ? i / (NB - 1) : 0.5;
     const p = 0.10 + 0.72 * q + (alea(i + 5) - 0.5) * 0.06;
     const y0 = cimeY + H * p, a0 = axe(y0), d0 = demi(y0);
     const cote = i % 2 ? -1 : 1;
     const w0 = Math.max(2.2 * E, d0 * 0.42);
-    const len = (48 + 210 * Math.pow(p, 0.9)) * E * (0.8 + 0.4 * alea(i + 13));
+    const len = (48 + 210 * Math.pow(p, 0.9)) * E * jeune * (0.8 + 0.4 * alea(i + 13));
     // plus la branche naît bas, plus elle part à l'horizontale
     const mont = 0.62 - 0.34 * p + alea(i + 19) * 0.16;
     const ang = cote > 0 ? -mont : -(Math.PI - mont);
     const bx = a0 + cote * d0 * 0.48;
-    ramifie(bx, y0, ang, len, w0, 3, cote, i * 17 + 3);
+    ramifie(bx, y0, ang, len, w0, NIV, cote, i * 17 + 3);
     jonctions.push([bx, y0, w0]);
   }
 
@@ -3487,10 +3496,18 @@ function dessineNid(c, E, x, y, t, nuit) {
 
     if (libre) dessineSysteme(tx, cimeY, t0, E, false);   // moitié d'orbite au fond
 
-    // ---- le tronc, ses branches et son feuillage ----
-    if (bas - cimeY < 72 * E){
+    /* ---- le tronc, ses branches et son feuillage ----
+       Les deux silhouettes se croisent sur sept minutes : basculer d'un coup de
+       la pousse à l'arbre faisait apparaître une ramure entière en une frame. */
+    const HT = bas - cimeY;
+    const fondu = Math.max(0, Math.min(1, (HT - 62 * E) / (42 * E)));
+    if (fondu < 1){
+      ctx.globalAlpha = 1 - fondu;
       dessinePousse(ctx, E, tx, cimeY, bas, t0, nuit);
-    } else {
+      ctx.globalAlpha = 1;
+    }
+    if (fondu > 0){
+      ctx.globalAlpha = fondu;
       const ancres = dessineTronc(ctx, E, tx, cimeY, bas, t0, nuit);
       // la saison éclaircit la ramure : en hiver il ne reste presque rien
       const dens = SAISON.densite;
@@ -3504,8 +3521,10 @@ function dessineNid(c, E, x, y, t, nuit) {
         }
         // la couronne suit l'axe réel du fût, qui serpente et se balance
         dessineCouronne(ctx, E, ancres[0].x, ancres[0].y,
-                        86 * (.66 + dens * .34), t0, nuit);
+                        86 * (.66 + dens * .34) * Math.min(1, HT / (420 * E)),
+                        t0, nuit);
       }
+      ctx.globalAlpha = 1;
     }
 
     // ---- le sol et le nid, visibles au début de la journée ----
@@ -3589,7 +3608,7 @@ function dessineNid(c, E, x, y, t, nuit) {
     }
 
     // ---- le grimpeur, accroché à la cime qu'on suit ----
-    if (aDebloque("diver") && bas - cimeY > 72 * E){
+    if (aDebloque("diver") && bas - cimeY > 150 * E){
       const monte = { prairie:"ecureuil", ciel:"oiseau", nuages:"ballon",
                       espace:"fusee", lune:"fusee", trou:"fusee" }[etage];
       ctx.save();
