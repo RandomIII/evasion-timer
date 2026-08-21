@@ -12686,6 +12686,19 @@ function dessineNid(c, E, x, y, t, nuit) {
     }
     paysageSol(g, W, Hh, solY, ee, nuit, 0, E, om, al);
     paysageRoute(g, W, Hh, solY, ee, nuit, 0, E, om, al);
+    /* Le bord lointain de la voie tranche net dans l'herbe, ce qui la fait lire
+       comme un haut de mur. On l'y fond, en reprenant la couleur du sol juste
+       au-dessus plutôt qu'une teinte devinée. */
+    {
+      const yR = solY + (Hh - solY) * .42;
+      const pix = g.getImageData(Math.round(W * .5), Math.round(yR - 6), 1, 1).data;
+      const herbe = pix[0] + "," + pix[1] + "," + pix[2];
+      const fo = g.createLinearGradient(0, yR - 3, 0, yR + (Hh - solY) * .13);
+      fo.addColorStop(0, "rgba(" + herbe + ",.92)");
+      fo.addColorStop(1, "rgba(" + herbe + ",0)");
+      g.fillStyle = fo;
+      g.fillRect(0, yR - 3, W, (Hh - solY) * .13 + 3);
+    }
     /* Les arbres rejoignent le décor cuit : leur balancement ne se voyait pas à
        cette échelle et il coûtait à lui seul un tiers de la frame. */
     if (aDebloque("bg"))
