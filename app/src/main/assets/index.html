@@ -11924,28 +11924,690 @@ function dessineNid(c, E, x, y, t, nuit) {
     const s = Math.sin((i + gr * 53.1) * 12.9898 + 78.233) * 43758.5453;
     return s - Math.floor(s);
   };
-  // repli temporaire : sera remplacé par le module de l'agent
+  // Chantier du village : l'ouvrier batisseur et son echafaudage, six epoques.
+  // Repere local en pixels, origine au sol, y negatif vers le haut,
+  // lumiere venant du haut-droite (0.66, -0.75).
+
   function batisseur(c, S, ep, marche, nuit, t, om, al){
-    const b = marche ? Math.sin(t * 7) * .4 : 0;
-    c.fillStyle = om(52, 44, 38);
-    c.beginPath(); c.arc(0, -S * .84, S * .16, 0, 6.283); c.fill();
-    c.fillRect(-S * .12, -S * .70, S * .24, S * .38);
-    c.strokeStyle = om(52, 44, 38); c.lineWidth = Math.max(1, S * .09); c.lineCap = "round";
-    c.beginPath();
-    c.moveTo(0, -S * .34); c.lineTo(b * S * .22, 0);
-    c.moveTo(0, -S * .34); c.lineTo(-b * S * .22, 0);
-    c.stroke();
+    var e = ep | 0; if (e < 0) e = 0; if (e > 5) e = 5;
+    var W = marche ? 1 : 0;
+
+    // Palettes par epoque : peau, tenue, garniture, coiffe, metal, bois.
+    var SK = [[198,152,108],[200,158,116],[194,148,106],[204,164,126],[206,170,134],[172,192,208]][e];
+    var CL = [[132,96,60],[212,194,156],[126,80,44],[48,76,132],[216,150,34],[86,100,122]][e];
+    var TR = [[92,66,40],[170,62,52],[86,54,30],[32,50,88],[58,70,88],[62,206,244]][e];
+    var HT = [[60,44,32],[54,40,28],[64,46,32],[68,50,34],[234,198,46],[78,94,114]][e];
+    var MT = [[128,124,118],[198,136,60],[152,122,76],[168,172,178],[198,204,210],[126,158,186]][e];
+    var WD = [[122,88,52],[136,100,60],[130,94,56],[108,78,48],[92,96,104],[70,82,100]][e];
+    var LG = [SK,SK,WD,CL,TR,CL][e];   // jambes
+    var AB = [SK,SK,SK,CL,CL,CL][e];   // bras
+    var CH = [SK,CL,[198,180,146],CL,CL,CL][e];   // buste
+    var PV = [CL,CL,WD,CL,TR,CL][e];   // bassin
+    var FC = [SK,SK,WD,TR,TR,CL][e];   // pieds
+
+    function K(g,k,o){
+      return om(Math.min(255,g[0]*k), Math.min(255,g[1]*k), Math.min(255,g[2]*k), o===undefined?1:o);
+    }
+
+    var OUT = false, OW = S*0.052, INK = om(16,12,10,1);
+
+    function path(p,dx,dy){
+      dx = dx||0; dy = dy||0;
+      c.beginPath();
+      for(var i=0;i<p.length;i+=2){
+        if(i) c.lineTo(p[i]+dx,p[i+1]+dy); else c.moveTo(p[i]+dx,p[i+1]+dy);
+      }
+    }
+    function sc(p){ var o=[],i; for(i=0;i<p.length;i++) o.push(p[i]*S); return o; }
+
+    // Membre : trait epais a bouts ronds, l'articulation vient du coude du trace.
+    function bone(p,w,g,k){
+      k = k||0.86;
+      c.lineCap='round'; c.lineJoin='round';
+      if(OUT){ c.strokeStyle=INK; c.lineWidth=w+OW; path(p); c.stroke(); return; }
+      c.strokeStyle=K(g,k); c.lineWidth=w; path(p); c.stroke();
+      c.strokeStyle=K(g,k*1.45); c.lineWidth=w*0.30; path(p,w*0.19,-w*0.19); c.stroke();
+    }
+    // Volume ferme : l'arete haut-droite est reeclairee par decalage puis clip.
+    function slab(p,g,k){
+      var i, x0=p[0], x1=p[0], y0=p[1], y1=p[1];
+      for(i=2;i<p.length;i+=2){
+        if(p[i]<x0)x0=p[i]; if(p[i]>x1)x1=p[i];
+        if(p[i+1]<y0)y0=p[i+1]; if(p[i+1]>y1)y1=p[i+1];
+      }
+      k = k||0.86;
+      c.lineJoin='round';
+      if(OUT){ c.fillStyle=INK; c.strokeStyle=INK; c.lineWidth=OW; path(p); c.closePath(); c.fill(); c.stroke(); return; }
+      c.fillStyle=K(g,k); path(p); c.closePath(); c.fill();
+      var w = Math.max(S*0.010, Math.min(x1-x0,y1-y0)*0.34);
+      c.save(); path(p); c.closePath(); c.clip();
+      c.strokeStyle=K(g,k*1.42); c.lineWidth=w;
+      path(p,-w*0.5,w*0.5); c.closePath(); c.stroke();
+      c.restore();
+    }
+    function ball(x,y,r,g,k){
+      k = k||0.86;
+      if(OUT){ c.fillStyle=INK; c.beginPath(); c.arc(x,y,r+OW*0.5,0,6.2832); c.fill(); return; }
+      c.fillStyle=K(g,k); c.beginPath(); c.arc(x,y,r,0,6.2832); c.fill();
+      c.fillStyle=K(g,k*1.34); c.beginPath(); c.arc(x+r*0.26,y-r*0.26,r*0.66,0,6.2832); c.fill();
+    }
+    function seg(x1,x2,h,g,k){ slab([x1,-h, x2,-h, x2,h, x1,h], g, k); }
+
+    // ---------- cadence ----------
+    var wp = t*4.2, hp = t*2.35;
+    var u = hp - Math.floor(hp);
+    var blow = Math.round(hp);
+    var lift = u<0.70 ? Math.pow(u/0.70,1.15) : 1-Math.pow((u-0.70)/0.30,2.2);
+    var hit = u>0.94 ? (u-0.94)/0.06 : (u<0.14 ? 1-u/0.14 : 0);
+    if(W){ lift = 0; hit = 0; }
+
+    // ---------- jambes ----------
+    var LT = S*0.205, LS = S*0.205, FT = S*0.038;
+    var th1,kn1,th2,kn2;
+    if(W){
+      th1 = 0.60*Math.sin(wp);          kn1 = 0.16+0.90*Math.max(0,-Math.sin(wp));
+      th2 = 0.60*Math.sin(wp+3.14159);  kn2 = 0.16+0.90*Math.max(0,-Math.sin(wp+3.14159));
+    } else {
+      th1 = 0.32+0.07*(1-lift); kn1 = 0.24;
+      th2 = -0.34;              kn2 = 0.44;
+    }
+    function jnt(th,kn){
+      var kx = Math.sin(th)*LT, ky = Math.cos(th)*LT;
+      return [kx, ky, kx+Math.sin(th-kn)*LS, ky+Math.cos(th-kn)*LS];
+    }
+    var J1 = jnt(th1,kn1), J2 = jnt(th2,kn2);
+    // Le bassin se pose sur la jambe la plus tendue : le rebond vient de la.
+    var hipY = -Math.max(J1[3],J2[3]) - FT;
+
+    // ---------- buste, tete ----------
+    var TOR = S*0.285;
+    var lean = W ? 0.15+0.035*Math.sin(wp*2) : 0.08+0.30*(1-lift);
+    var cs = Math.cos(lean), sn = Math.sin(lean);
+    function R(x,y){ return [x*cs-y*sn, hipY+x*sn+y*cs]; }
+    var SHp = R(-S*0.012,-TOR);
+    var HDp = R(S*0.030,-TOR-S*0.150);
+    var HR = S*0.105;
+
+    // ---------- bras ----------
+    // Cinematique inverse : on pose la main, le coude est rejete en arriere.
+    var UA = S*0.160, FA = S*0.150;
+    function ik(px2,py2){
+      var dx = px2-SHp[0], dy = py2-SHp[1];
+      var d = Math.sqrt(dx*dx+dy*dy) || 1e-4;
+      var ux = dx/d, uy = dy/d;
+      var mn = Math.abs(UA-FA)+1e-4, mx = UA+FA-1e-4;
+      if(d < mn) d = mn; if(d > mx) d = mx;
+      var aa = (d*d+UA*UA-FA*FA)/(2*d);
+      var hh = Math.sqrt(Math.max(0,UA*UA-aa*aa));
+      var ex = -uy*hh, ey = ux*hh;
+      if(ex > 0){ ex = -ex; ey = -ey; }
+      return [SHp[0]+ux*aa+ex, SHp[1]+uy*aa+ey, SHp[0]+ux*d, SHp[1]+uy*d];
+    }
+    var hnx,hny,tAng;
+    if(W){
+      hnx = SHp[0]-S*0.105;
+      hny = SHp[1]+S*0.055+S*0.012*Math.sin(wp*2);
+      tAng = -2.35;
+    } else {
+      hnx = S*0.215 - S*0.305*lift;
+      hny = -S*0.450 - S*0.455*lift;
+      tAng = 0.325 - 2.275*lift;
+    }
+    var AN = ik(hnx,hny);
+    var aF = W ? 0.55*Math.sin(wp+3.14159) : 0.78-0.15*lift;
+    var AF = ik(SHp[0]+Math.sin(aF)*S*0.285, SHp[1]+Math.cos(aF)*S*0.285);
+
+    var TL = S*(e===4?0.25:0.27);
+    var tdx = Math.sin(tAng), tdy = Math.cos(tAng);
+    var tipx = AN[2]+tdx*TL, tipy = AN[3]+tdy*TL;
+
+    // ---------- pieces ----------
+    function limb(J,g,k){
+      bone([0,hipY, J[0],hipY+J[1], J[2],hipY+J[3]], S*0.072, g, 0.85*k);
+      var ax = J[2], ay = hipY+J[3];
+      var tilt = Math.min(0.55, Math.max(0, (-ay/S-0.06)*2.4));
+      bone([ax,ay, ax+S*0.098, ay+FT*0.30+S*0.05*tilt], S*0.046, FC, 0.80*k);
+    }
+    function armDraw(A,k){
+      bone([SHp[0],SHp[1], A[0],A[1], A[2],A[3]], S*0.060, AB, 0.88*k);
+      if(!OUT) ball(A[2],A[3],S*0.031, SK, 0.90*k);
+    }
+    function body(){
+      c.save(); c.translate(0,hipY); c.rotate(lean);
+      slab(sc([-0.086,-0.146, 0.088,-0.152, 0.080,0.034, -0.078,0.028]), PV, 0.84);
+      slab(sc([-0.082,-0.320, 0.090,-0.302, 0.104,-0.150, -0.100,-0.132]), CH, 0.88);
+      ball(-S*0.006,-S*0.300, S*0.054, CH, 0.94);
+      if(!OUT){
+        if(e<=3){ c.fillStyle=K(TR,0.95); c.fillRect(-S*0.088,-S*0.172,S*0.182,S*0.042); }
+        if(e===2) slab(sc([-0.015,-0.300, 0.100,-0.256, 0.094,0.090, -0.048,0.070]), CL, 0.92);
+        if(e===3){
+          c.strokeStyle=K(TR,1.25); c.lineWidth=S*0.020; c.lineCap='round';
+          c.beginPath(); c.moveTo(-S*0.050,-S*0.312); c.lineTo(S*0.030,-S*0.170); c.stroke();
+        }
+        if(e===4){ c.fillStyle=K([246,246,232],0.92); c.fillRect(-S*0.096,-S*0.246,S*0.198,S*0.036); }
+        if(e===5){
+          c.strokeStyle=K(TR,1.0,0.85); c.lineWidth=S*0.016; c.lineCap='round';
+          c.beginPath();
+          c.moveTo(-S*0.070,-S*0.286); c.lineTo(S*0.086,-S*0.264);
+          c.moveTo(-S*0.084,-S*0.180); c.lineTo(S*0.096,-S*0.166);
+          c.stroke();
+        }
+      }
+      c.restore();
+    }
+    function head(){
+      var hx = HDp[0], hy = HDp[1];
+      bone([SHp[0]+S*0.012,SHp[1], hx-S*0.014,hy+S*0.078], S*0.054, SK, 0.78);
+      ball(hx+HR*0.30, hy+HR*0.52, HR*0.62, SK, 0.82);           // machoire
+      ball(hx, hy, HR, SK, 0.92);
+      slab([hx+HR*0.62,hy-HR*0.08, hx+HR*1.16,hy+HR*0.12, hx+HR*0.60,hy+HR*0.34], SK, 0.95); // nez de profil
+      if(OUT){
+        // La coiffe fait partie de la silhouette : on la reprend en encre.
+        if(e===4) slab([hx-HR*1.30,hy-HR*0.30, hx+HR*1.50,hy-HR*0.30, hx+HR*1.44,hy-HR*0.02, hx-HR*1.24,hy-HR*0.02], HT);
+        c.fillStyle=INK; c.beginPath(); c.arc(hx-HR*0.06,hy-HR*0.22,HR*1.10+OW*0.5,0,6.2832); c.fill();
+        return;
+      }
+      if(e===0){
+        ball(hx-HR*0.60,hy-HR*0.30,HR*0.58, HT, 0.80);
+        c.save(); c.translate(hx,hy); c.rotate(-0.10);
+        c.fillStyle=K(TR,1.0); c.fillRect(-HR*1.05,-HR*0.86,HR*2.1,HR*0.42); c.restore();
+        slab([hx-HR*0.30,hy+HR*0.42, hx+HR*0.62,hy+HR*0.30,
+              hx+HR*0.52,hy+HR*0.92, hx-HR*0.24,hy+HR*0.86], HT, 0.74);
+      } else if(e===1){
+        c.fillStyle=K(CL,0.94); c.beginPath();
+        c.arc(hx,hy,HR*1.14, Math.PI*0.62, Math.PI*1.95); c.closePath(); c.fill();
+        c.fillStyle=K(CL,1.26); c.beginPath();
+        c.arc(hx,hy,HR*1.14, Math.PI*1.55, Math.PI*1.95); c.arc(hx,hy,HR*0.90, Math.PI*1.95, Math.PI*1.55, true);
+        c.closePath(); c.fill();
+        slab([hx-HR*0.20,hy+HR*0.40, hx+HR*0.66,hy+HR*0.26,
+              hx+HR*0.54,hy+HR*1.00, hx-HR*0.16,hy+HR*0.92], HT, 0.74);
+      } else if(e===2){
+        c.fillStyle=K(HT,0.92); c.beginPath();
+        c.arc(hx,hy,HR*1.10, Math.PI*1.02, Math.PI*2.02); c.closePath(); c.fill();
+        c.fillStyle=K(HT,1.28); c.beginPath();
+        c.arc(hx,hy,HR*1.10, Math.PI*1.52, Math.PI*1.98); c.arc(hx,hy,HR*0.86, Math.PI*1.98, Math.PI*1.52, true);
+        c.closePath(); c.fill();
+      } else if(e===3){
+        c.fillStyle=K(HT,0.92); c.beginPath();
+        c.arc(hx,hy,HR*1.06, Math.PI*1.02, Math.PI*2.0); c.closePath(); c.fill();
+        slab([hx+HR*0.10,hy-HR*1.06, hx+HR*1.32,hy-HR*0.96, hx+HR*1.30,hy-HR*0.74, hx+HR*0.10,hy-HR*0.82], HT, 1.05);
+      } else if(e===4){
+        slab([hx-HR*1.30,hy-HR*0.28, hx+HR*1.50,hy-HR*0.34, hx+HR*1.44,hy-HR*0.02, hx-HR*1.22,hy+HR*0.02], HT, 0.90);
+        c.fillStyle=K(HT,1.02); c.beginPath();
+        c.arc(hx,hy-HR*0.10,HR*1.16, Math.PI*1.0, Math.PI*2.0); c.closePath(); c.fill();
+        c.fillStyle=K(HT,1.36); c.beginPath();
+        c.arc(hx,hy-HR*0.10,HR*1.16, Math.PI*1.46, Math.PI*1.96);
+        c.arc(hx,hy-HR*0.10,HR*0.84, Math.PI*1.96, Math.PI*1.46, true); c.closePath(); c.fill();
+      } else {
+        ball(hx-HR*0.04,hy-HR*0.14,HR*1.10, HT, 0.94);
+        slab([hx+HR*0.18,hy-HR*0.42, hx+HR*1.06,hy-HR*0.18, hx+HR*0.94,hy+HR*0.40, hx+HR*0.16,hy+HR*0.34], TR, 0.80);
+      }
+    }
+    function toolDraw(){
+      c.save();
+      c.translate(AN[2],AN[3]);
+      c.rotate(Math.atan2(tdy,tdx));
+      if(e===0){
+        seg(-S*0.055, TL*0.72, S*0.024, WD, 0.86);
+        slab([TL*0.60,-S*0.070, TL*0.86,-S*0.080, TL*1.00,-S*0.026,
+              TL*0.98,S*0.048, TL*0.78,S*0.070, TL*0.60,S*0.052], MT, 0.88);
+        if(!OUT){
+          c.strokeStyle=K(TR,0.8); c.lineWidth=S*0.013; c.lineCap='round';
+          c.beginPath();
+          c.moveTo(TL*0.60,-S*0.052); c.lineTo(TL*0.70,S*0.050);
+          c.moveTo(TL*0.62,S*0.046); c.lineTo(TL*0.72,-S*0.056);
+          c.stroke();
+        }
+      } else if(e===1){
+        seg(-S*0.055, S*0.105, S*0.028, WD, 0.86);
+        seg(S*0.085, TL*0.82, S*0.019, MT, 1.0);
+        slab([TL*0.80,-S*0.019, TL*1.0,-S*0.004, TL*1.0,S*0.009, TL*0.80,S*0.019], MT, 1.28);
+      } else if(e===2){
+        seg(-S*0.060, TL*0.78, S*0.022, WD, 0.86);
+        slab([TL*0.72,-S*0.078, TL*0.98,-S*0.070, TL*0.98,S*0.070, TL*0.72,S*0.078], MT, 0.90);
+        if(!OUT){ c.fillStyle=K(MT,0.62); c.fillRect(TL*0.82,-S*0.074,S*0.016,S*0.148); }
+      } else if(e===3){
+        seg(-S*0.060, TL*0.80, S*0.019, WD, 0.84);
+        slab([TL*0.78,-S*0.062, TL*1.0,-S*0.054, TL*1.0,S*0.046, TL*0.78,S*0.054], MT, 0.94);
+        slab([TL*0.78,-S*0.054, TL*0.72,-S*0.096, TL*0.62,-S*0.088, TL*0.74,-S*0.042], MT, 0.80);
+      } else if(e===4){
+        slab([-S*0.030,-S*0.058, S*0.135,-S*0.046, S*0.135,S*0.026, -S*0.030,S*0.028], HT, 0.86);
+        slab([-S*0.022,S*0.018, S*0.052,S*0.018, S*0.044,S*0.098, -S*0.018,S*0.094], TR, 0.80);
+        seg(S*0.128, S*0.180, S*0.030, MT, 1.0);
+        seg(S*0.175, TL, S*0.010, MT, 1.12);
+      } else {
+        seg(-S*0.050, S*0.088, S*0.028, MT, 0.90);
+        slab([S*0.080,-S*0.030, S*0.150,-S*0.016, S*0.150,S*0.016, S*0.080,S*0.030], MT, 1.10);
+        if(!OUT){
+          var pu = (0.72+0.28*Math.sin(t*2.1))*(0.55+0.45*nuit);
+          c.save(); c.globalCompositeOperation='lighter';
+          c.fillStyle='rgba(90,220,255,'+(0.26*pu).toFixed(3)+')';
+          path([S*0.145,-S*0.052, TL,-S*0.012, TL,S*0.012, S*0.145,S*0.052]); c.closePath(); c.fill();
+          c.fillStyle='rgba(220,250,255,'+(0.85*pu).toFixed(3)+')';
+          path([S*0.150,-S*0.020, TL*0.99,-S*0.005, TL*0.99,S*0.005, S*0.150,S*0.020]); c.closePath(); c.fill();
+          c.restore();
+        }
+      }
+      c.restore();
+    }
+
+    function figure(){
+      limb(J2, LG, 0.62);
+      armDraw(AF, 0.62);
+      body();
+      limb(J1, LG, 1.0);
+      head();
+      armDraw(AN, 1.0);
+      toolDraw();
+    }
+
+    // ---------- rendu ----------
+    c.save();
+    // Ombre de contact : elle s'ouvre et palit quand le pied quitte le sol.
+    function contact(ax,h,w0){
+      var s = Math.min(0.5, Math.max(0, -h/S));
+      var ry = S*0.026 + s*S*0.055, rx = w0 + Math.min(S*0.075, s*S*0.35);
+      c.fillStyle = om(10,8,6, (0.32-0.42*s)*(1-0.45*nuit));
+      c.beginPath();
+      c.ellipse(ax*0.7+S*0.02, -ry-S*0.002, rx, ry, 0, 0, 6.2832);
+      c.fill();
+    }
+    contact(J1[2], hipY+J1[3], S*0.100);
+    contact(J2[2], hipY+J2[3], S*0.092);
+
+    OUT = true;  figure();
+    OUT = false; figure();
+
+    if(!W && hit>0.02 && e!==4){
+      var sp = (e===5) ? [150,240,255] : [255,196,110];
+      // En plein jour l'additif sature le ciel : on le retient.
+      var ad = 0.42+0.58*nuit;
+      c.save(); c.globalCompositeOperation='lighter';
+      for(var i=0;i<10;i++){
+        var an = 0.30+al(blow*17+i)*2.55;
+        var ln = (0.35+al(blow*17+i+53)*0.95)*S*0.15;
+        var d = (1-hit)*ln;
+        var sx2 = tipx+Math.cos(an)*d;
+        var sy2 = tipy-Math.sin(an)*d + d*d/(S*0.42);
+        var rr = Math.max(0.35, S*0.017*(0.45+al(i*3+7)*0.9)*hit);
+        c.fillStyle = 'rgba('+sp[0]+','+sp[1]+','+sp[2]+','+(0.85*ad*hit).toFixed(3)+')';
+        c.beginPath(); c.arc(sx2,sy2,rr,0,6.2832); c.fill();
+      }
+      c.fillStyle = 'rgba('+sp[0]+','+sp[1]+','+sp[2]+','+(0.18*ad*hit).toFixed(3)+')';
+      c.beginPath(); c.arc(tipx,tipy,S*0.085*hit,0,6.2832); c.fill();
+      c.restore();
+    }
+    if(!W && hit>0.02 && e===4){
+      for(var j=0;j<4;j++){
+        var dd = (1-hit)*S*0.10*(0.4+al(blow*11+j)*0.9);
+        c.fillStyle = om(206,196,176, 0.26*hit);
+        c.beginPath();
+        c.arc(tipx-dd*0.7+al(j*5+3)*S*0.04, tipy-dd*0.9, S*0.026+dd*0.5, 0, 6.2832);
+        c.fill();
+      }
+    }
+    if(e===5){
+      var a5 = 0.45+0.55*nuit;
+      c.save(); c.globalCompositeOperation='lighter';
+      c.fillStyle='rgba(80,210,255,'+(0.18*a5).toFixed(3)+')';
+      c.beginPath(); c.arc(tipx,tipy,S*0.10,0,6.2832); c.fill();
+      var cp = R(S*0.055,-S*0.210);
+      c.fillStyle='rgba(120,230,255,'+(0.34*a5).toFixed(3)+')';
+      c.beginPath(); c.arc(cp[0],cp[1],S*0.042,0,6.2832); c.fill();
+      c.restore();
+    }
+    if(nuit>0.12 && e>=4){
+      c.save(); c.globalCompositeOperation='lighter';
+      var lx = HDp[0]+HR*1.02, ly = HDp[1]-HR*0.10;
+      var lc = (e===4) ? '255,236,180' : '170,235,255';
+      c.fillStyle = 'rgba('+lc+','+(0.10*nuit).toFixed(3)+')';
+      path([lx,ly-S*0.020, lx+S*0.140,ly-S*0.080, lx+S*0.140,ly+S*0.105, lx,ly+S*0.022]);
+      c.closePath(); c.fill();
+      c.fillStyle = 'rgba('+lc+','+(0.55*nuit).toFixed(3)+')';
+      c.beginPath(); c.arc(lx,ly,S*0.026,0,6.2832); c.fill();
+      c.restore();
+    }
+    c.restore();
   }
+
   function echafaudage(c, L, H, ep, avance, nuit, t, om, al){
-    const k = Math.max(0, Math.min(1, 1 - avance));
-    c.strokeStyle = om(126, 96, 58, .8); c.lineWidth = Math.max(1, L * .02);
-    for (let i = 0; i <= 2; i++){
-      const y = -H * k * (i / 2);
-      c.beginPath(); c.moveTo(-L * .5, y); c.lineTo(L * .5, y); c.stroke();
+    var e = ep | 0; if (e < 0) e = 0; if (e > 5) e = 5;
+    var a = avance; if(!(a>0)) a = 0; if(a>1) a = 1;
+    var rest = 1-a;
+    var nu = nuit<0?0:(nuit>1?1:nuit);
+    var i,j,b,k;
+
+    // Materiaux par epoque : membrures, planchers, liens (lianes, cordes, rivets, filets).
+    var MAT = [[126,104,66],[176,148,102],[152,122,76],[104,96,90],[178,188,196],[96,132,164]][e];
+    var PLK = [[134,112,74],[170,142,98],[166,136,90],[148,118,76],[198,184,152],[112,152,182]][e];
+    var TIE = [[98,116,58],[198,178,134],[176,158,118],[76,70,66],[70,158,116],[70,220,255]][e];
+
+    function K(g,kk,o){
+      return om(Math.min(255,g[0]*kk), Math.min(255,g[1]*kk), Math.min(255,g[2]*kk), o===undefined?1:o);
     }
-    for (const x of [-L * .5, L * .5]){
-      c.beginPath(); c.moveTo(x, 0); c.lineTo(x, -H * k); c.stroke();
+
+    var hw = L*0.455;
+    var top = H*(0.20+0.80*rest);
+    var nb = Math.round(L/(H*0.55)); if(nb<2)nb=2; if(nb>4)nb=4;
+    var np = nb+1;
+    var nl = Math.max(1, Math.round(top/(H*0.26)));
+    var sw = Math.min(L,H)*0.032;
+    var bx = L*0.082, by = -H*0.042;     // plan arriere, projection oblique
+    var flo = (e===5) ? -H*0.055 : 0;    // l'armature lumineuse ne touche pas le sol
+
+    var lv = [], px = [], ph = [];
+    for(k=0;k<nl;k++) lv.push(flo-(top+flo)*(k+1)/nl);
+    for(i=0;i<np;i++){
+      px.push(-hw + 2*hw*(i/(np-1)) + (al(i*7+3)-0.5)*L*0.030);
+      var hi = Math.max(-top*1.03, -top*(0.88+0.15*al(i*5+11))*(1-0.30*a*al(i*3+2)));
+      // Un montant sur deux tient au moins le premier niveau : il reste toujours un vestige.
+      ph.push(i%2 ? hi : Math.min(hi, lv[0]-sw*0.6));
     }
+    // Le balancement croit avec la hauteur : le pied reste plante.
+    function sxo(y){ return Math.sin(t*0.42+al(4)*6.2832)*L*0.008*Math.pow(Math.min(1,Math.abs(y)/(top+1e-6)),1.7); }
+    function bob(n){ return (e===5) ? Math.sin(t*0.5+al(n*13+7)*6.2832)*H*0.016 : 0; }
+
+    var glow = [];
+
+    function bar(x1,y1,x2,y2,w,g,kk,spec){
+      var dx = x2-x1, dy = y2-y1, ln = Math.sqrt(dx*dx+dy*dy);
+      if(ln < 1e-6) return;
+      var nx = dy/ln, ny = -dx/ln;
+      if(nx*0.66 - ny*0.75 < 0){ nx = -nx; ny = -ny; }
+      var h = w*0.5;
+      c.beginPath();
+      c.moveTo(x1+nx*h,y1+ny*h); c.lineTo(x2+nx*h,y2+ny*h);
+      c.lineTo(x2-nx*h,y2-ny*h); c.lineTo(x1-nx*h,y1-ny*h); c.closePath();
+      c.fillStyle = K(g,0.80*kk); c.fill();
+      c.strokeStyle = K(g,0.34*kk); c.lineWidth = Math.max(0.35,w*0.13); c.stroke();
+      c.beginPath();
+      c.moveTo(x1+nx*h,y1+ny*h); c.lineTo(x2+nx*h,y2+ny*h);
+      c.lineTo(x2+nx*h*0.12,y2+ny*h*0.12); c.lineTo(x1+nx*h*0.12,y1+ny*h*0.12); c.closePath();
+      c.fillStyle = K(g,1.32*kk); c.fill();
+      if(spec){
+        c.strokeStyle = K(g,1.70*kk,0.75); c.lineWidth = Math.max(0.3,w*0.14);
+        c.beginPath(); c.moveTo(x1+nx*h*0.55,y1+ny*h*0.55); c.lineTo(x2+nx*h*0.55,y2+ny*h*0.55); c.stroke();
+      }
+    }
+    function pole(x1,y1,x2,y2,w,g,kk,sd){
+      var mx = (x1+x2)*0.5 + (al(sd)-0.5)*w*3.4, my = (y1+y2)*0.5;
+      c.lineCap = 'round';
+      c.strokeStyle = K(g,0.34*kk); c.lineWidth = w*1.30;
+      c.beginPath(); c.moveTo(x1,y1); c.quadraticCurveTo(mx,my,x2,y2); c.stroke();
+      c.strokeStyle = K(g,0.78*kk); c.lineWidth = w;
+      c.beginPath(); c.moveTo(x1,y1); c.quadraticCurveTo(mx,my,x2,y2); c.stroke();
+      c.strokeStyle = K(g,1.30*kk); c.lineWidth = w*0.30;
+      c.beginPath(); c.moveTo(x1+w*0.22,y1-w*0.22);
+      c.quadraticCurveTo(mx+w*0.22,my-w*0.22,x2+w*0.22,y2-w*0.22); c.stroke();
+    }
+    function member(x1,y1,x2,y2,w,g,kk,sd){
+      if(e===0) pole(x1,y1,x2,y2,w,g,kk,sd);
+      else bar(x1,y1,x2,y2,w,g,kk,(e===3||e===4));
+      if(e===5) glow.push([x1,y1,x2,y2,w,kk]);
+    }
+    function joint(x,y,w,kk){
+      if(e<=1){
+        c.strokeStyle = K(TIE,0.95*kk); c.lineWidth = Math.max(0.4,w*0.34); c.lineCap='round';
+        c.beginPath();
+        c.moveTo(x-w*0.75,y-w*0.40); c.lineTo(x+w*0.75,y+w*0.40);
+        c.moveTo(x-w*0.75,y+w*0.40); c.lineTo(x+w*0.75,y-w*0.40);
+        c.stroke();
+      } else if(e===2){
+        c.fillStyle = K(TIE,0.70*kk);
+        c.beginPath(); c.arc(x,y,w*0.30,0,6.2832); c.fill();
+      } else if(e===3 || e===4){
+        c.fillStyle = K(TIE,1.0*kk);
+        c.beginPath(); c.arc(x,y,w*0.46,0,6.2832); c.fill();
+        c.fillStyle = K(TIE,1.55*kk);
+        c.beginPath(); c.arc(x+w*0.13,y-w*0.13,w*0.19,0,6.2832); c.fill();
+      }
+    }
+
+    function plane(ox,oy,kk,front){
+      for(i=0;i<np;i++){
+        var x = px[i]+ox;
+        if(e===5){
+          for(j=0;j<nl;j++){
+            var ya = (j===0 ? flo : lv[j-1]+bob(j-1)) + oy;
+            var yb = lv[j]+bob(j) + oy;
+            if(lv[j] < ph[i]) continue;
+            member(x+sxo(ya),ya+(yb-ya)*0.10, x+sxo(yb),yb-(yb-ya)*0.06, sw*0.75, MAT, kk, i*3+j);
+          }
+        } else {
+          // Le montant penche : on remonte le pied du creux que prend son angle.
+          var tl = Math.abs(sxo(ph[i])-sxo(0))/(Math.abs(ph[i])||1);
+          member(x+sxo(0),oy-sw*0.60*tl, x+sxo(ph[i]),ph[i]+oy, sw, MAT, kk, i*3+1);
+        }
+      }
+      for(j=0;j<nl;j++){
+        var yr = lv[j]+bob(j), y = yr+oy;
+        for(i=0;i<np-1;i++){
+          if(ph[i] > yr || ph[i+1] > yr) continue;
+          if(al(j*29+i*7+5) < a*0.55) continue;
+          member(px[i]+ox+sxo(yr), y, px[i+1]+ox+sxo(yr), y, sw*0.78, MAT, kk, j*11+i+40);
+          if(front){
+            joint(px[i]+ox+sxo(yr), y, sw, kk);
+            joint(px[i+1]+ox+sxo(yr), y, sw, kk);
+          }
+        }
+        // Boulins : les bouts qui depassent cassent la grille reguliere.
+        if(front && al(j*19+9) > 0.35+a*0.4){
+          var xe = px[np-1]+ox+sxo(yr);
+          member(xe-sw, y, xe+L*0.055, y-H*0.006, sw*0.62, MAT, kk, j*7+3);
+        }
+      }
+    }
+
+    function deck(){
+      for(j=0;j<nl;j++){
+        var yr = lv[j]+bob(j);
+        for(b=0;b<np-1;b++){
+          if(al(j*23+b*5+1) < a*0.95) continue;
+          if(ph[b] > yr || ph[b+1] > yr) continue;
+          var x1 = px[b]+sxo(yr)-sw*0.4-al(j*13+b)*L*0.012;
+          var x2 = px[b+1]+sxo(yr)+sw*0.4+al(j*13+b+21)*L*0.014;
+          var n = 3;
+          for(var q=0;q<n;q++){
+            if(a>0.25 && al(j*41+b*9+q*3+2) < (a-0.25)*0.9) continue;
+            var u0 = q/n, u1 = (q+1)/n-0.05;
+            var jx = (al(j*17+b*5+q)-0.5)*L*0.010;
+            var ax = bx*u0, ay = by*u0, cx = bx*u1, cy = by*u1;
+            c.beginPath();
+            c.moveTo(x1+ax+jx, yr+ay); c.lineTo(x2+ax+jx, yr+ay);
+            c.lineTo(x2+cx+jx, yr+cy); c.lineTo(x1+cx+jx, yr+cy);
+            c.closePath();
+            c.fillStyle = K(PLK, (1.10-0.30*u0)*(e===5?0.9:1), e===5?0.55:1);
+            c.fill();
+            c.strokeStyle = K(PLK,0.42); c.lineWidth = Math.max(0.3,sw*0.14); c.stroke();
+            if(q===0){
+              c.fillStyle = K(PLK,0.55);
+              c.fillRect(x1+jx, yr, (x2-x1), sw*0.42);   // chant de la planche de rive
+            }
+          }
+        }
+      }
+    }
+
+    function braces(){
+      if(e===5) return;
+      for(j=0;j<nl;j++){
+        var y2 = lv[j]+bob(j), y1 = (j ? lv[j-1]+bob(j-1) : flo-sw*0.45);
+        for(b=0;b<np-1;b++){
+          if(al(j*31+b*13+7) < 0.28+a*0.62) continue;
+          if(ph[b] > y2 || ph[b+1] > y2) continue;
+          var up = ((b+j)%2 === 0);
+          var xA = (up?px[b]:px[b+1])+sxo(y1), xB = (up?px[b+1]:px[b])+sxo(y2);
+          member(xA,y1, xB,y2, sw*0.60, MAT, 0.92, b*17+j+70);
+        }
+      }
+    }
+
+    function ladder(x0,y0,x1,y1){
+      var dx = x1-x0, dy = y1-y0, ln = Math.sqrt(dx*dx+dy*dy);
+      if(ln<1e-6) return;
+      var off = sw*1.4;
+      var nx = dy/ln*off, ny = -dx/ln*off;
+      // Le montant incline sortirait sous le sol : on enfonce le pied d'autant.
+      var over = y0+Math.abs(ny)+sw*0.4;
+      if(over > 0){
+        y0 -= over; dy = y1-y0; ln = Math.sqrt(dx*dx+dy*dy);
+        nx = dy/ln*off; ny = -dx/ln*off;
+      }
+      member(x0+nx,y0+ny, x1+nx,y1+ny, sw*0.55, MAT, 1.0, 91);
+      member(x0-nx,y0-ny, x1-nx,y1-ny, sw*0.55, MAT, 1.0, 92);
+      var rn = Math.max(3, Math.round(ln/(sw*3.2)));
+      for(var r=1;r<rn;r++){
+        var u = r/rn;
+        bar(x0+dx*u+nx, y0+dy*u+ny, x0+dx*u-nx, y0+dy*u-ny, sw*0.34, PLK, 1.0, false);
+      }
+    }
+
+    function net(){
+      var yt = lv[Math.min(nl-1,1)], yb = flo;
+      var xa = px[0]+sxo(yt), xb = px[Math.min(np-1,1)]+sxo(yt);
+      var hh = yb-yt;
+      c.save();
+      c.beginPath(); c.moveTo(xa,yb); c.lineTo(xb,yb); c.lineTo(xb,yt); c.lineTo(xa,yt); c.closePath();
+      c.fillStyle = K(TIE,1.0,0.13); c.fill();
+      c.strokeStyle = K(TIE,1.35,0.60); c.lineWidth = Math.max(0.3,sw*0.13);
+      var st = Math.max(sw*0.8, L*0.026);
+      c.beginPath();
+      // Mailles en losange bornees a la nappe : pas de trait qui deborde.
+      for(var g2=-Math.ceil(hh/st)-1; g2<Math.ceil((xb-xa)/st)+2; g2++){
+        var xs = xa+g2*st;
+        var a1 = Math.max(yt, yb-(xb-xs)), b1 = Math.min(yb, yb-(xa-xs));
+        if(a1 < b1){ c.moveTo(xs+(yb-a1),a1); c.lineTo(xs+(yb-b1),b1); }
+        var a2 = Math.max(yt, yb-(xs-xa)), b2 = Math.min(yb, yb-(xs-xb));
+        if(a2 < b2){ c.moveTo(xs-(yb-a2),a2); c.lineTo(xs-(yb-b2),b2); }
+      }
+      c.stroke();
+      c.restore();
+    }
+
+    function hoist(){
+      var yr = lv[nl-1]+bob(nl-1);
+      var hx = px[np-1]+sxo(yr)-L*0.02;
+      var sway = Math.sin(t*0.55)*0.14;
+      var rl = Math.min(H*0.30, L*0.30, -yr-H*0.10-sw*3);
+      if(rl < H*0.05) return;
+      var lx = hx+Math.sin(sway)*rl, ly = yr+Math.cos(sway)*rl;
+      c.strokeStyle = K(TIE, e>=3?0.9:1.0); c.lineWidth = Math.max(0.4,sw*0.26); c.lineCap='round';
+      c.beginPath(); c.moveTo(hx,yr); c.lineTo(lx,ly); c.stroke();
+      if(e<=1){
+        bar(lx-L*0.035,ly+sw*0.9, lx+L*0.035,ly+sw*0.9, sw*2.0, PLK, 0.95, false);
+      } else if(e===2 || e===3){
+        bar(lx-L*0.030,ly+sw*1.1, lx+L*0.030,ly+sw*1.1, sw*2.4, MAT, 0.9, e===3);
+      } else if(e===4){
+        bar(lx-L*0.034,ly+sw*1.2, lx+L*0.034,ly+sw*1.2, sw*2.2, PLK, 1.0, false);
+      }
+    }
+
+    // Trois disques concentriques : un halo qui s'eteint, sans degrade a construire.
+    function halo(x,y,r,col,a){
+      var q;
+      for(q=0;q<3;q++){
+        c.fillStyle = 'rgba('+col+','+(a*[0.30,0.34,0.40][q]).toFixed(3)+')';
+        c.beginPath(); c.arc(x,y,r*[1,0.62,0.32][q],0,6.2832); c.fill();
+      }
+    }
+
+    function pile(){
+      var n = Math.round(1+5*rest);
+      var bxw = L*0.052, bhh = H*0.026;
+      for(i=0;i<n;i++){
+        var row = i%3, lay = (i/3)|0;
+        var x = -hw*0.98 + row*bxw*1.08 + lay*bxw*0.30 + (al(i*9+5)-0.5)*L*0.006;
+        var y = -lay*bhh*1.05;
+        bar(x, y-bhh*0.5, x+bxw*0.92, y-bhh*0.5, bhh, PLK, 0.95, e>=3);
+      }
+    }
+
+    // ---------- rendu ----------
+    c.save();
+    c.lineJoin = 'round';
+
+    if(e!==5){
+      c.fillStyle = om(10,8,6, 0.28*(1-0.45*nu));
+      for(i=0;i<np;i++){
+        c.beginPath();
+        c.ellipse(px[i]+bx*0.4, -sw*0.64, sw*1.9, sw*0.62, 0, 0, 6.2832);
+        c.fill();
+      }
+    } else {
+      c.save(); c.globalCompositeOperation='lighter';
+      c.fillStyle = 'rgba(70,190,255,0.10)';
+      c.beginPath(); c.ellipse(bx*0.4, -H*0.032, hw*1.1, H*0.030, 0, 0, 6.2832); c.fill();
+      c.restore();
+    }
+
+    plane(bx, by, 0.58, false);
+    deck();
+    plane(0, 0, 1.0, true);
+    braces();
+
+    if((e===1 || e===2) && a<0.88 && nl>0){
+      var lyr = lv[0]+bob(0);
+      ladder(px[np-2]+L*0.02, flo-sw*0.7, px[np-2]-L*0.02, lyr+sw);
+      if(nl>2 && a<0.55) ladder(px[1]-L*0.02, lv[1], px[1]+L*0.02, lv[2]+sw);
+    }
+    if(e===4 && a<0.72 && nl>1) net();
+    if(a<0.82 && nl>0) hoist();
+    pile();
+
+    if(e===5 && glow.length){
+      c.save(); c.globalCompositeOperation='lighter';
+      c.lineCap = 'round';
+      for(i=0;i<glow.length;i++){
+        var G = glow[i];
+        c.strokeStyle = 'rgba(70,200,255,'+(0.16*G[5]).toFixed(3)+')';
+        c.lineWidth = G[4]*2.6;
+        c.beginPath(); c.moveTo(G[0],G[1]); c.lineTo(G[2],G[3]); c.stroke();
+        c.strokeStyle = 'rgba(200,245,255,'+(0.55*G[5]).toFixed(3)+')';
+        c.lineWidth = G[4]*0.30;
+        c.beginPath(); c.moveTo(G[0],G[1]); c.lineTo(G[2],G[3]); c.stroke();
+      }
+      c.restore();
+    }
+
+    if(nu > 0.05 && nl > 0){
+      var lamps = (nl>2) ? 2 : 1;
+      for(i=0;i<lamps;i++){
+        var lj = (i===0) ? nl-1 : Math.max(0,nl-3);
+        // La lampe redescend si sa flamme sortirait de l'encombrement annonce.
+        var lyy = Math.max(lv[lj]+bob(lj), -H*1.06+7.6*sw);
+        var lxx = (i===0 ? px[np-1] : px[0]) + sxo(lyy) + (i===0 ? -L*0.03 : L*0.03);
+        var cw = Math.min(sw*7.0, L*0.085);
+        var flick = 0.82+0.18*Math.sin(t*(1.7+i*0.6)+al(i*31+3)*6.2832);
+        if(e<=2){
+          bar(lxx-sw*1.1, lyy-sw*2.1, lxx+sw*1.1, lyy-sw*2.1, sw*1.4, MAT, 0.75, false);
+          bar(lxx, lyy-sw*0.4, lxx, lyy-sw*2.0, sw*0.7, MAT, 0.6, false);
+          c.save(); c.globalCompositeOperation='lighter';
+          halo(lxx, lyy-sw*3.0, sw*5.0*flick, '255,168,70', 0.34*nu*flick);
+          c.fillStyle = 'rgba(255,226,168,'+(0.90*nu*flick).toFixed(3)+')';
+          c.beginPath();
+          c.moveTo(lxx-sw*0.8, lyy-sw*2.5);
+          c.quadraticCurveTo(lxx-sw*0.3, lyy-sw*3.8, lxx+sw*0.1, lyy-sw*4.9*flick);
+          c.quadraticCurveTo(lxx+sw*1.0, lyy-sw*3.4, lxx+sw*0.8, lyy-sw*2.5);
+          c.closePath(); c.fill();
+          c.restore();
+        } else {
+          bar(lxx, lyy-sw*0.4, lxx, lyy-sw*1.8, sw*0.5, MAT, 0.8, true);
+          bar(lxx-sw*0.9, lyy-sw*2.0, lxx+sw*0.9, lyy-sw*2.0, sw*1.1, MAT, 0.9, true);
+          c.save(); c.globalCompositeOperation='lighter';
+          var lc2 = (e===5) ? '150,235,255' : '255,238,190';
+          c.fillStyle = 'rgba('+lc2+','+(0.14*nu*flick).toFixed(3)+')';
+          c.beginPath();
+          c.moveTo(lxx-sw*0.9, lyy-sw*1.9); c.lineTo(lxx+sw*0.9, lyy-sw*1.9);
+          var cby = Math.min(H*0.24, -lyy-H*0.012);
+          c.lineTo(lxx+cw, lyy+cby); c.lineTo(lxx-cw, lyy+cby);
+          c.closePath(); c.fill();
+          halo(lxx, lyy-sw*1.8, sw*2.6, lc2, 0.55*nu*flick);
+          c.restore();
+        }
+      }
+    }
+
+    c.restore();
   }
 
   /* Perspective atmosphérique : plus un objet est loin, plus sa matière tire
