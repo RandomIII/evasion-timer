@@ -3875,6 +3875,9 @@ function dessineNid(c, E, x, y, t, nuit) {
     };
     pose(5, -.052, .60, true);
     pose(6,  .004, 1.00, false);
+    // rang de chantier : le bâtisseur remonte le village de gauche à droite
+    PARCELLES.map((q, i) => i).sort((a2, b2) => PARCELLES[a2].u - PARCELLES[b2].u)
+             .forEach((idx, rang) => { PARCELLES[idx].rang = rang; });
     for (let i = 0; i < 40; i++)
       fumees.push({ p: Math.random(), v: Math.random() * .35 + .25,
                     x: Math.random(), r: Math.random() * .5 + .5 });
@@ -11921,6 +11924,30 @@ function dessineNid(c, E, x, y, t, nuit) {
     const s = Math.sin((i + gr * 53.1) * 12.9898 + 78.233) * 43758.5453;
     return s - Math.floor(s);
   };
+  // repli temporaire : sera remplacé par le module de l'agent
+  function batisseur(c, S, ep, marche, nuit, t, om, al){
+    const b = marche ? Math.sin(t * 7) * .4 : 0;
+    c.fillStyle = om(52, 44, 38);
+    c.beginPath(); c.arc(0, -S * .84, S * .16, 0, 6.283); c.fill();
+    c.fillRect(-S * .12, -S * .70, S * .24, S * .38);
+    c.strokeStyle = om(52, 44, 38); c.lineWidth = Math.max(1, S * .09); c.lineCap = "round";
+    c.beginPath();
+    c.moveTo(0, -S * .34); c.lineTo(b * S * .22, 0);
+    c.moveTo(0, -S * .34); c.lineTo(-b * S * .22, 0);
+    c.stroke();
+  }
+  function echafaudage(c, L, H, ep, avance, nuit, t, om, al){
+    const k = Math.max(0, Math.min(1, 1 - avance));
+    c.strokeStyle = om(126, 96, 58, .8); c.lineWidth = Math.max(1, L * .02);
+    for (let i = 0; i <= 2; i++){
+      const y = -H * k * (i / 2);
+      c.beginPath(); c.moveTo(-L * .5, y); c.lineTo(L * .5, y); c.stroke();
+    }
+    for (const x of [-L * .5, L * .5]){
+      c.beginPath(); c.moveTo(x, 0); c.lineTo(x, -H * k); c.stroke();
+    }
+  }
+
   /* Perspective atmosphérique : plus un objet est loin, plus sa matière tire
      vers la couleur de l'horizon. C'est ce qui recolle des assets dessinés
      séparément ; sans ça le fond n'est qu'une version rapetissée du premier plan. */
@@ -11952,6 +11979,7 @@ function dessineNid(c, E, x, y, t, nuit) {
      ça dépend de l'heure, pas de la frame. Le monument, lui, reste vivant :
      c'est là que sont la flamme, la bannière et les anneaux. */
   const BATIS = new Map();
+  const MARGE_BAS = 6;               // marge sous la ligne de sol, dans le sprite
   function spriteBati(ep, k, L, H, gr, nuit, brume, ciel){
     /* La couleur d'horizon dérive en continu : brute dans la clef, elle faisait
        recuire tous les sprites à chaque frame. On la quantifie par paliers de 16. */
@@ -11964,7 +11992,7 @@ function dessineNid(c, E, x, y, t, nuit) {
     cv.width = Math.max(2, Math.ceil(L * 1.4));
     cv.height = Math.max(2, Math.ceil(H * 1.35 + 8));
     const g = cv.getContext("2d");
-    g.translate(cv.width / 2, cv.height - 6);
+    g.translate(cv.width / 2, cv.height - MARGE_BAS);
     batiment(g, ep, L, H, gr, nuit, 0, teinteScene(nuit, brume, ciel));
     if (BATIS.size > 80) BATIS.clear();          // borne mémoire au changement de taille
     BATIS.set(cle, cv);
@@ -12006,22 +12034,33 @@ function dessineNid(c, E, x, y, t, nuit) {
     const t0 = performance.now() / 1000;
     const emax = epoqueMax();
     const ee = Math.min(emax, (libre ? 1 : p) * (CIEL_V.length - 1));
+    /* Le chantier : les parcelles passent à l'époque suivante une par une, de
+       gauche à droite, le monument en dernier. C'est sa bascule à lui qui fait
+       tourner tout le décor, d'où le fondu court juste après. */
+    const iEre = Math.min(emax, Math.floor(ee)), suiv = Math.min(emax, iEre + 1);
+    const u = Math.max(0, Math.min(1, ee - Math.floor(ee)));
+    const chantier = suiv > iEre;
+    const NP = PARCELLES.length;
+    const seuilPl = (rang) => .06 + .66 * (NP > 1 ? rang / (NP - 1) : 0);
+    const SEUIL_MON = .84, SEUIL_DEC = .90;
+    const fd = chantier ? Math.max(0, Math.min(1, (u - SEUIL_DEC) / .07)) : 0;
+    const eeVis = iEre + fd;
     // la cité future se vit de nuit : c'est là que les néons servent à quelque chose
-    const nuit = Math.max(0, Math.min(1, (ee - 3.7) / 1.3));
+    const nuit = Math.max(0, Math.min(1, (eeVis - 3.7) / 1.3));
     const jour = 1 - nuit;
     const E = ech() * dpr;
     anneeV = interpV(ANNEES, ee); popV = interpV(POPS, ee);
-    epNom = NOMS_EP[Math.min(NOMS_EP.length - 1, Math.round(ee))];
+    epNom = NOMS_EP[Math.min(NOMS_EP.length - 1, Math.round(eeVis))];
 
     const solY = Hh * .76;
     const om = teinteNuit(nuit), al = aleaDe(.271);
-    const cielBas = couleurVil(ee, "b");           // cible du fondu atmosphérique
+    const cielBas = couleurVil(eeVis, "b");        // cible du fondu atmosphérique
 
     // ---- le ciel ----
     const g = ctx.createLinearGradient(0, 0, 0, solY);
-    g.addColorStop(0,   "rgb(" + couleurVil(ee, "h") + ")");
-    g.addColorStop(.62, "rgb(" + couleurVil(ee, "m") + ")");
-    g.addColorStop(1,   "rgb(" + couleurVil(ee, "b") + ")");
+    g.addColorStop(0,   "rgb(" + couleurVil(eeVis, "h") + ")");
+    g.addColorStop(.62, "rgb(" + couleurVil(eeVis, "m") + ")");
+    g.addColorStop(1,   "rgb(" + couleurVil(eeVis, "b") + ")");
     ctx.fillStyle = g; ctx.fillRect(0, 0, W, solY);
 
     if (nuit > .03){                                 // étoiles, seulement le soir venu
@@ -12036,7 +12075,7 @@ function dessineNid(c, E, x, y, t, nuit) {
        l'heure, et c'est le seul repère qui relie la scène au vrai compte à rebours. */
     const ax2 = W * (.10 + p * .80), ay = solY * (.72 - Math.sin(p * 3.1416) * .58);
     const lune = nuit > .5;
-    const cs = lune ? [226, 232, 244] : mix([255, 246, 208], [255, 138, 74], Math.min(1, ee / 4));
+    const cs = lune ? [226, 232, 244] : mix([255, 246, 208], [255, 138, 74], Math.min(1, eeVis / 4));
     const sr = (lune ? 26 : 34) * E;
     ctx.save();
     ctx.globalCompositeOperation = "lighter";
@@ -12049,12 +12088,18 @@ function dessineNid(c, E, x, y, t, nuit) {
     ctx.fillStyle = "rgb(" + cs + ")";
     ctx.beginPath(); ctx.arc(ax2, ay, sr, 0, 6.283); ctx.fill();
     if (lune){                                       // croissant : on mord le disque
-      ctx.fillStyle = "rgb(" + couleurVil(ee, "m") + ")";
+      ctx.fillStyle = "rgb(" + couleurVil(eeVis, "m") + ")";
       ctx.beginPath(); ctx.arc(ax2 + sr * .38, ay - sr * .22, sr * .92, 0, 6.283); ctx.fill();
     }
 
-    paysageNuages(ctx, W, Hh, solY, ee, nuit, t0, E, om, al);
-    ctx.drawImage(decorVillage(ee, nuit, solY, E), 0, 0);
+    paysageNuages(ctx, W, Hh, solY, eeVis, nuit, t0, E, om, al);
+    // le décor bascule d'un bloc derrière le monument, en fondu court
+    ctx.drawImage(decorVillage(iEre, nuit, solY, E), 0, 0);
+    if (fd > 0){
+      ctx.globalAlpha = fd;
+      ctx.drawImage(decorVillage(suiv, nuit, solY, E), 0, 0);
+      ctx.globalAlpha = 1;
+    }
     /* Voile d'horizon : la ligne de sol séparait le cadre en deux images sans
        transition, un lointain pâle posé sur un premier plan sombre. */
     const hz = ctx.createLinearGradient(0, solY - Hh * .09, 0, solY + (Hh - solY) * .20);
@@ -12064,7 +12109,7 @@ function dessineNid(c, E, x, y, t, nuit) {
     ctx.fillStyle = hz;
     ctx.fillRect(0, solY - Hh * .09, W, (Hh - solY) * .20 + Hh * .09);
     if (aDebloque("bg"))
-      paysageArbres(ctx, W, Hh, solY, ee, nuit, t0, E,
+      paysageArbres(ctx, W, Hh, solY, eeVis, nuit, t0, E,
                     teinteScene(nuit, .17, cielBas), al);
     // la voie garde ses bornes : habitants et convoi s'y placent
     const rY = solY + (Hh - solY) * .42, rH = (Hh - solY) * .32;
@@ -12074,21 +12119,21 @@ function dessineNid(c, E, x, y, t, nuit) {
        bâtiment, ce qui se lit comme un chantier et non comme un fondu global. */
     const rendu = [];
     for (const q of PARCELLES){
-      const e = Math.max(0, Math.min(emax, Math.floor(ee - q.dec + 1)));
-      const pousse = e === 0 ? 1
-                   : Math.max(0, Math.min(1, (ee - q.dec - (e - 1)) / .045));
-      rendu.push({ q: q, e: e, g: pousse });
+      const sq = seuilPl(q.rang), fait = chantier && u >= sq;
+      rendu.push({ q: q, e: fait ? suiv : iEre, s: sq,
+                   g: fait ? Math.max(0, Math.min(1, (u - sq) / .022)) : 1 });
     }
     if (aDebloque("algues")) for (const r of rendu){
       if (r.q.fond) dessineParcelle(r, solY, ee, nuit, t0, E, cielBas);
     }
     // le monument, entre les deux rangées
     if (aDebloque("tresor")){
-      const em = Math.max(0, Math.min(emax, Math.floor(ee - .5 + 1)));
-      const gm = em === 0 ? 1 : Math.max(0, Math.min(1, (ee - .5 - (em - 1)) / .045));
+      const faitM = chantier && u >= SEUIL_MON;
+      const em = faitM ? suiv : iEre;
+      const gm = faitM ? Math.max(0, Math.min(1, (u - SEUIL_MON) / .022)) : 1;
       const HM = (Hh - solY) * 1.9 * (.55 + em * .16);
       ctx.save();
-      ctx.translate(W * .5, solY - (Hh - solY) * .10);
+      ctx.translate(W * .5, solY + (Hh - solY) * .012);
       ctx.scale(1, Math.max(.04, gm));
       monument(ctx, em, 120 * E, HM, t0, nuit);
       ctx.restore();
@@ -12096,6 +12141,8 @@ function dessineNid(c, E, x, y, t, nuit) {
     if (aDebloque("algues")) for (const r of rendu){
       if (!r.q.fond) dessineParcelle(r, solY, ee, nuit, t0, E, cielBas);
     }
+    if (chantier) dessineOuvrier(rendu, u, iEre, solY, nuit, t0, E);
+
     /* Le grand foyer : une flaque de lumière chaude au cœur du village. C'est
        lui qui rend la nuit habitée plutôt que simplement sombre. */
     if (aDebloque("feu") && nuit > .04){
@@ -12258,6 +12305,52 @@ function dessineNid(c, E, x, y, t, nuit) {
     ctx.fillStyle = vig; ctx.fillRect(0, 0, W, Hh);
   }
 
+  /* Le bâtisseur remonte le village de gauche à droite : il marche jusqu'à la
+     parcelle suivante, frappe quelques instants, et elle change d'époque. Le
+     monument est sa dernière étape. */
+  function dessineOuvrier(rendu, u, ep, solY, nuit, t0, E){
+    const etapes = [];
+    for (const r of rendu)
+      etapes[r.q.rang] = { x: r.q.u * W, y: solY + (Hh - solY) * r.q.dy,
+                           s: r.s, L: (78 + r.q.gr * 30) * E * r.q.ech,
+                           H: (58 + r.q.gr * 26 + r.e * 26) * E * r.q.ech };
+    etapes.push({ x: W * .5, y: solY + (Hh - solY) * .012, s: .84,
+                  L: 120 * E, H: (Hh - solY) * 1.9 });
+    const TRAV = .035;                       // durée du travail sur place, en avancement
+    let j = 0;
+    while (j < etapes.length && u >= etapes[j].s) j++;
+    if (j >= etapes.length){                 // le village est fait : il s'en va
+      const q = Math.min(1, (u - etapes[etapes.length - 1].s) / .10);
+      const S = 17 * E;
+      ctx.save();
+      ctx.translate(etapes[etapes.length - 1].x + q * W * .6, solY + (Hh - solY) * .04);
+      batisseur(ctx, S, ep, 1, nuit, t0, teinteScene(nuit, .10, couleurVil(ep, "b")),
+                aleaDe(.61));
+      ctx.restore();
+      return;
+    }
+    const cible = etapes[j], dep = j > 0 ? etapes[j - 1] : { x: -W * .12, y: cible.y };
+    const t0s = j > 0 ? etapes[j - 1].s : 0, t1s = cible.s;
+    const arrivee = Math.max(t0s, t1s - TRAV);
+    const marche = u < arrivee;
+    const av = marche ? (u - t0s) / Math.max(.001, arrivee - t0s)
+                      : (u - arrivee) / Math.max(.001, t1s - arrivee);
+    const lisse = marche ? av * av * (3 - 2 * av) : 1;
+    const x = dep.x + (cible.x - dep.x) * lisse;
+    const y = dep.y + (cible.y - dep.y) * lisse;
+    const om2 = teinteScene(nuit, .10, couleurVil(ep, "b")), al2 = aleaDe(.61);
+    if (!marche){                            // l'échafaudage se monte pendant les coups
+      ctx.save();
+      ctx.translate(cible.x, cible.y);
+      echafaudage(ctx, cible.L, cible.H, ep, 1 - av, nuit, t0, om2, al2);
+      ctx.restore();
+    }
+    ctx.save();
+    ctx.translate(x + (marche ? 0 : cible.L * .42), y);
+    batisseur(ctx, 17 * E, ep, marche ? 1 : 0, nuit, t0, om2, al2);
+    ctx.restore();
+  }
+
   // pose d'une parcelle : place, met à l'échelle, applique la pousse du chantier
   function dessineParcelle(r, solY, ee, nuit, t0, E, cielBas){
     const q = r.q;
@@ -12273,7 +12366,9 @@ function dessineNid(c, E, x, y, t, nuit) {
     ctx.ellipse(q.u * W, base, L * .56, Math.max(2, L * .075), 0, 0, 6.283);
     ctx.fill();
     if (q.fond){ ctx.globalAlpha = .92; }
-    ctx.drawImage(sp, q.u * W - sp.width / 2, base - (sp.height - 6) * g2 - 6 * g2,
+    /* La ligne de sol du sprite est à `sp.height - MARGE_BAS` : c'est elle qu'il
+       faut poser sur `base`, pas le bas du canvas. Les maisons flottaient. */
+    ctx.drawImage(sp, q.u * W - sp.width / 2, base - (sp.height - MARGE_BAS) * g2,
                   sp.width, sp.height * g2);
     ctx.restore();
     if (r.g < 1){                                    // poussière de chantier
