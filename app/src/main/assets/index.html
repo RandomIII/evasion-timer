@@ -3860,6 +3860,7 @@ function dessineNid(c, E, x, y, t, nuit) {
 
   const PARCELLES = [], fumees = [], lucioles = [];
   let vilPret = false, anneeV = ANNEES[0], popV = POPS[0], epNom = NOMS_EP[0];
+  let dernierVillage = 0;                 // cadence de rendu du Village
   function initVillage(){
     if (vilPret) return;
     vilPret = true;
@@ -3873,8 +3874,8 @@ function dessineNid(c, E, x, y, t, nuit) {
                          gr: Math.abs(Math.sin(k * 7.13) * 43758.5) % 1 });
       }
     };
-    pose(5, -.052, .60, true);
-    pose(6,  .004, 1.00, false);
+    pose(4, .000, .62, true);
+    pose(5, .055, 1.00, false);
     // rang de chantier : le bâtisseur remonte le village de gauche à droite
     PARCELLES.map((q, i) => i).sort((a2, b2) => PARCELLES[a2].u - PARCELLES[b2].u)
              .forEach((idx, rang) => { PARCELLES[idx].rang = rang; });
@@ -12685,6 +12686,21 @@ function dessineNid(c, E, x, y, t, nuit) {
     }
     paysageSol(g, W, Hh, solY, ee, nuit, 0, E, om, al);
     paysageRoute(g, W, Hh, solY, ee, nuit, 0, E, om, al);
+    /* Les arbres rejoignent le décor cuit : leur balancement ne se voyait pas à
+       cette échelle et il coûtait à lui seul un tiers de la frame. */
+    if (aDebloque("bg"))
+      paysageArbres(g, W, Hh, solY, ee, nuit, 0, E,
+                    teinteScene(nuit, .17, couleurVil(ee, "b")), al);
+    /* L'étalonnage est cuit avec le décor plutôt que repassé en `multiply` sur
+       tout l'écran à chaque frame. */
+    g.save();
+    g.globalCompositeOperation = "source-atop";   // ne teinte que ce qui est déjà peint
+    const et = g.createLinearGradient(0, 0, 0, Hh);
+    et.addColorStop(0,   "rgba(64,88,168,.085)");
+    et.addColorStop(.52, "rgba(255,244,222,.030)");
+    et.addColorStop(1,   "rgba(186,104,36,.090)");
+    g.fillStyle = et; g.fillRect(0, 0, W, Hh);
+    g.restore();
     DECOR.cle = cle; DECOR.cv = cv;
     return cv;
   }
@@ -12770,9 +12786,7 @@ function dessineNid(c, E, x, y, t, nuit) {
     hz.addColorStop(1,   "rgba(" + cielBas + ",0)");
     ctx.fillStyle = hz;
     ctx.fillRect(0, solY - Hh * .09, W, (Hh - solY) * .20 + Hh * .09);
-    if (aDebloque("bg"))
-      paysageArbres(ctx, W, Hh, solY, eeVis, nuit, t0, E,
-                    teinteScene(nuit, .17, cielBas), al);
+
     // la voie garde ses bornes : habitants et convoi s'y placent
     const rY = solY + (Hh - solY) * .42, rH = (Hh - solY) * .32;
 
@@ -12793,9 +12807,9 @@ function dessineNid(c, E, x, y, t, nuit) {
       const faitM = chantier && u >= SEUIL_MON;
       const em = faitM ? suiv : iEre;
       const gm = faitM ? Math.max(0, Math.min(1, (u - SEUIL_MON) / .022)) : 1;
-      const HM = (Hh - solY) * 1.9 * (.55 + em * .16);
+      const HM = (Hh - solY) * 1.45 * (.55 + em * .16);
       ctx.save();
-      ctx.translate(W * .5, solY + (Hh - solY) * .012);
+      ctx.translate(W * .70, solY + (Hh - solY) * .026);
       ctx.scale(1, Math.max(.04, gm));
       monument(ctx, em, 120 * E, HM, t0, nuit);
       ctx.restore();
@@ -12945,26 +12959,15 @@ function dessineNid(c, E, x, y, t, nuit) {
     /* Étalonnage : bascule froide en haut, chaude en bas, sur tout le cadre.
        C'est la dernière chose qui donne à onze assets séparés l'air d'avoir été
        peints le même jour. */
-    ctx.save();
-    ctx.globalCompositeOperation = "multiply";
-    const et = ctx.createLinearGradient(0, 0, 0, Hh);
-    et.addColorStop(0,   "rgb(234,237,251)");
-    et.addColorStop(.52, "rgb(255,251,243)");
-    et.addColorStop(1,   "rgb(253,237,220)");
-    ctx.fillStyle = et; ctx.fillRect(0, 0, W, Hh);
-    ctx.restore();
-
     // voile central, pour que le compteur reste lisible sur un ciel clair
-    const vg = ctx.createRadialGradient(W * .5, Hh * .42, 0, W * .5, Hh * .42,
-                                        Math.max(W, Hh) * .55);
-    vg.addColorStop(0, "rgba(8,10,20," + (.20 - nuit * .10) + ")");
-    vg.addColorStop(1, "rgba(8,10,20,0)");
+    /* Un seul dégradé fait le voile central et le vignettage : deux passes
+       plein écran par frame, c'est autant de fois la surface du canvas. */
+    const vg = ctx.createRadialGradient(W * .5, Hh * .44, 0,
+                                        W * .5, Hh * .48, Math.max(W, Hh) * .78);
+    vg.addColorStop(0,   "rgba(8,10,20," + (.17 - nuit * .09) + ")");
+    vg.addColorStop(.34, "rgba(6,8,16," + (.04 - nuit * .02) + ")");
+    vg.addColorStop(1,   "rgba(0,4,10," + (.14 + nuit * .22) + ")");
     ctx.fillStyle = vg; ctx.fillRect(0, 0, W, Hh);
-    const vig = ctx.createRadialGradient(W * .5, Hh * .5, Math.min(W, Hh) * .34,
-                                         W * .5, Hh * .5, Math.max(W, Hh) * .8);
-    vig.addColorStop(0, "rgba(0,4,10,0)");
-    vig.addColorStop(1, "rgba(0,4,10," + (.13 + nuit * .24) + ")");
-    ctx.fillStyle = vig; ctx.fillRect(0, 0, W, Hh);
   }
 
   /* Le bâtisseur remonte le village de gauche à droite : il marche jusqu'à la
@@ -12976,8 +12979,8 @@ function dessineNid(c, E, x, y, t, nuit) {
       etapes[r.q.rang] = { x: r.q.u * W, y: solY + (Hh - solY) * r.q.dy,
                            s: r.s, L: (78 + r.q.gr * 30) * E * r.q.ech,
                            H: (58 + r.q.gr * 26 + r.e * 26) * E * r.q.ech };
-    etapes.push({ x: W * .5, y: solY + (Hh - solY) * .012, s: .84,
-                  L: 120 * E, H: (Hh - solY) * 1.9 });
+    etapes.push({ x: W * .70, y: solY + (Hh - solY) * .026, s: .84,
+                  L: 120 * E, H: (Hh - solY) * 1.45 });
     const TRAV = .035;                       // durée du travail sur place, en avancement
     let j = 0;
     while (j < etapes.length && u >= etapes[j].s) j++;
@@ -14544,6 +14547,12 @@ function dessineNid(c, E, x, y, t, nuit) {
     const [r, g2, bl] = accent();
 
     if (save.actif === "village"){       // ===== MONDE 4 : la marche des époques =====
+      /* Rien ne bouge vite dans ce monde : une image sur deux suffit, et le
+         canvas garde la précédente. C'est le seul levier qui divise le coût
+         par deux sans rien retirer à l'écran. */
+      const nv = performance.now();
+      if (nv - dernierVillage < 31) return;
+      dernierVillage = nv;
       dessineVillage(prog, enPause, alerte, phase === "libre", secDep);
       for (let i = bursts.length - 1; i >= 0; i--){
         const q = bursts[i];
