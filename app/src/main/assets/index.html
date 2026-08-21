@@ -10171,1002 +10171,510 @@ function dessineNid(c, E, x, y, t, nuit) {
 
   /* La voie du village : une seule bande, six états, tout interpolé.
      Repère écran, lumière du jour venant du haut-droite, ombres en bas-gauche. */
+  /* La voie du village : un plan au sol vu presque a ras, six epoques.
+     Tout part d'un horizon virtuel place au-dessus de la bande : c'est lui qui
+     donne le raccourci, la fuite des joints et l'ecrasement de ce qui est pose. */
   function paysageRoute(c, W, Hh, solY, ee, nuit, t, E, om, al){
     const y0 = solY + (Hh - solY) * 0.42;
     const y1 = solY + (Hh - solY) * 0.74;
     const H  = y1 - y0;
     if (!(H > 0) || !(W > 0)) return;
 
-    const e  = Math.max(0, Math.min(5, ee));
-    const A  = Math.min(4, Math.floor(e)), B = A + 1, u = e - A;
-    const N  = Math.max(0, Math.min(1, nuit));
-    const TAU = 6.28318;
+    const TAU = 6.283185307179586;
+    const e   = Math.max(0, Math.min(5, ee));
+    const A   = Math.min(4, Math.floor(e)), B = A + 1, u = e - A;
+    const N   = Math.max(0, Math.min(1, nuit));
 
-    const mx = (a) => a[A] + (a[B] - a[A]) * u;
-    const mc = (a) => [a[A][0] + (a[B][0] - a[A][0]) * u,
-                       a[A][1] + (a[B][1] - a[A][1]) * u,
-                       a[A][2] + (a[B][2] - a[A][2]) * u];
-    const w6 = (k) => (A === k ? 1 - u : 0) + (B === k ? u : 0);
-    const R  = (i) => al(i | 0);
-    const RR = (i, lo, hi) => lo + (hi - lo) * al(i | 0);
-    const cl = (x) => x < 0 ? 0 : x > 1 ? 1 : x;
+    const cl  = (x) => x < 0 ? 0 : x > 1 ? 1 : x;
+    const mx  = (a) => a[A] + (a[B] - a[A]) * u;
+    const mc  = (a) => [a[A][0] + (a[B][0] - a[A][0]) * u,
+                        a[A][1] + (a[B][1] - a[A][1]) * u,
+                        a[A][2] + (a[B][2] - a[A][2]) * u];
+    const w6  = (k) => (A === k ? 1 - u : 0) + (B === k ? u : 0);
+    const mel = (p, q, k) => [p[0] + (q[0] - p[0]) * k,
+                              p[1] + (q[1] - p[1]) * k,
+                              p[2] + (q[2] - p[2]) * k];
+    const K   = (col, a) => om(Math.max(0, Math.min(255, col[0] | 0)),
+                               Math.max(0, Math.min(255, col[1] | 0)),
+                               Math.max(0, Math.min(255, col[2] | 0)), cl(a));
 
-    // le bas de la bande est le plus proche : tout y est dessiné plus grand
-    const sc = (v) => 0.44 + 0.74 * v;
-    const yv = (v) => y0 + H * v;
-    const PH   = H * 0.27;                       // taille d'un habitant, étalon du mobilier
-    const hair = Math.max(0.55 * E, H * 0.007);
+    /* ---- projection ----
+       q = echelle laterale (1 au bord proche), d = 1/q la profondeur. Un pave du
+       fond fait donc 1/3 de large et 1/9 de haut : le plan se couche tout seul. */
+    const HOR  = 0.50;
+    const yHor = y0 - H * HOR;
+    const CD   = y1 - yHor;
+    const DF   = CD / (y0 - yHor);
+    const FLAT = 0.40;                       // ecrasement d'un disque au bord proche
+    const KX   = CD / FLAT;
+    const yOf  = (d) => yHor + CD / d;
+    const qOf  = (y) => (y - yHor) / CD;
+    const pxOf = (X, q) => W * 0.5 + X * q * KX;
+    const Xmx  = (q) => (W * 0.58) / (q * KX);
+    const hair = Math.max(0.6 * E, H * 0.006);
 
-    // ondulation reproductible d'une ligne qui traverse l'écran
-    const wob = (x, ph, amp) =>
-      (Math.sin(x / W * 9.3 + ph) * 0.62 + Math.sin(x / W * 24.1 + ph * 2.7) * 0.38) * amp;
-    const ligne = (yc, amp, ph) => {
-      c.beginPath();
-      const pas = W / 48;
-      for (let x = -pas; x <= W + pas; x += pas){
-        const yy = yc + wob(x, ph, amp);
-        if (x < 0) c.moveTo(x, yy); else c.lineTo(x, yy);
-      }
+    // ---- perspective atmospherique : desaturer, puis filer vers l'horizon ----
+    const HZM  = 0.52;
+    const hzOf = (d) => Math.pow(cl((d - 1) / (DF - 1)), 0.60) * HZM;
+
+    /* ---- tables d'epoque ----
+       0 terre battue, 1 voie dallee, 2 paves irreguliers, 3 paves + caniveau,
+       4 bitume, 5 dalle a rainures */
+    const BED = [[126, 99, 64], [120, 112, 96], [ 66, 54, 40], [ 62, 60, 60], [ 48, 48, 52], [126, 134, 146]];
+    const STC = [[130, 104, 68], [198, 190, 164], [116, 108, 94], [128, 128, 128], [ 56, 56, 60], [204, 212, 224]];
+    const JOI = [[108, 84, 54], [150, 142, 120], [ 54, 46, 36], [ 50, 48, 48], [ 44, 44, 48], [148, 158, 174]];
+    const HZC = [[178, 160, 126], [200, 192, 168], [152, 148, 138], [150, 150, 152], [166, 170, 178], [196, 208, 222]];
+    const SZK = [1.00, 1.55, 0.78, 0.95, 1.00, 2.10];   // taille de pierre
+    const IRR = [0.00, 0.10, 0.62, 0.16, 0.00, 0.02];   // irregularite des contours
+    const JOK = [0.00, 0.075, 0.21, 0.115, 0.00, 0.050];// joint, en fraction de pave
+    const VAR = [0.00, 0.16, 0.32, 0.20, 0.00, 0.07];   // teinte d'une pierre a l'autre
+    const REL = [0.00, 0.58, 1.00, 0.74, 0.00, 0.28];   // force du biseau
+    const DEN = [0.00, 1.00, 1.00, 1.00, 0.00, 1.00];   // presence du pavage
+    const GRA = [0.75, 0.20, 0.55, 0.26, 1.00, 0.08];   // grain de surface
+    const WET = [0.05, 0.06, 0.90, 0.26, 0.16, 0.10];   // humidite
+
+    const bedC = mc(BED), stC = mc(STC), joC = mc(JOI), hzC = mc(HZC);
+    const szk = mx(SZK), irr = mx(IRR), jok = mx(JOK), vaR = mx(VAR);
+    const rel0 = mx(REL), den = mx(DEN), gra = mx(GRA), wet = mx(WET);
+
+    const loin = (col, hz) => {
+      const g = col[0] * 0.30 + col[1] * 0.59 + col[2] * 0.11;
+      return mel(mel(col, [g, g, g], hz * 0.45), hzC, hz);
     };
 
-    /* ---- tables d'époque ----
-       0 terre battue, 1 voie romaine, 2 boue, 3 pavés + rails, 4 bitume, 5 dalle */
-    const BED = [[128,102,68],[94,88,78],[74,57,40],[66,64,66],[50,50,54],[140,148,160]];
-    const KH  = [0.000, 0.115, 0.040, 0.132, 0.104, 0.062];
-    const KC  = [[120,96,64],[178,172,154],[122,114,96],[130,126,124],[178,178,172],[214,222,232]];
-    const RUT = [0.55, 0.08, 1.00, 0.18, 0.14, 0.00];
-    const PUD = [0.35, 0.05, 1.00, 0.20, 0.30, 0.00];
-    const WLI = [0.00, 0.17, 0.04, 0.19, 0.13, 0.10];   // polissage clair du passage
-    const WDA = [0.32, 0.07, 0.34, 0.11, 0.19, 0.03];   // tassement sombre
-    const GRS = [1.00, 0.22, 0.78, 0.06, 0.02, 0.00];
-    const GUT = [0.00, 0.10, 0.00, 1.00, 0.55, 0.00];
-    const PEB = [1.00, 0.10, 0.55, 0.00, 0.00, 0.00];
+    // ---- nappe : une bande couchee entre deux profondeurs, bords ondulants ----
+    const nappe = (dLo, dHi, seed, ondu) => {
+      const pas = W / 44;
+      const yA = yOf(dLo), yB = yOf(dHi), qA = 1 / dLo, qB = 1 / dHi;
+      c.beginPath();
+      for (let x = -pas; x <= W + pas; x += pas){
+        const w = Math.sin(x / W * 7.7 + seed) * 0.62 + Math.sin(x / W * 19.3 + seed * 2.3) * 0.38;
+        const yy = yA + w * ondu * qA;
+        if (x < 0) c.moveTo(x, yy); else c.lineTo(x, yy);
+      }
+      for (let x = W + pas; x >= -pas; x -= pas){
+        const w = Math.sin(x / W * 8.9 + seed * 1.7) * 0.62 + Math.sin(x / W * 21.1 + seed * 3.1) * 0.38;
+        c.lineTo(x, yB + w * ondu * qB);
+      }
+      c.closePath();
+    };
+    const nappeF = (dLo, dHi, seed, ondu, col, a) => {
+      nappe(dLo, dHi, seed, ondu); c.fillStyle = K(col, a); c.fill();
+    };
 
-    const bed = mc(BED);
+    // tout ce qui est pose au sol est une ellipse, jamais un cercle
+    const posee = (x, y, rx, sq) => {
+      const ry = Math.max(0.25, rx * FLAT * qOf(y) * (sq === undefined ? 1 : sq));
+      c.beginPath(); c.ellipse(x, y, Math.max(0.35, rx), ry, 0, 0, TAU);
+    };
 
-    // pavages : hauteur de pierre en fraction de bande, largeur en multiple de celle-ci
-    const PAV = [
-      null,
-      { h:0.300, ar:1.45, irr:0.30, jo:0.055, co:[178,172,156], va:0.16, ro:0.045, de:1.00, gr:1, su:0 },
-      { h:0.205, ar:1.10, irr:0.58, jo:0.150, co:[122,113,100], va:0.28, ro:0.115, de:0.52, gr:0, su:1 },
-      { h:0.150, ar:1.18, irr:0.22, jo:0.090, co:[122,122,128], va:0.20, ro:0.035, de:1.00, gr:0, su:0 },
-      null,
-      { h:0.780, ar:2.20, irr:0.05, jo:0.016, co:[206,213,222], va:0.05, ro:0.006, de:1.00, gr:1, su:0 }
-    ];
-
-    c.save();
-
-    /* ================= 1. la chaussée, strictement dans la bande ================= */
     c.save();
     c.beginPath(); c.rect(0, y0, W, H); c.clip();
 
-    // lit : le fond de bande est loin donc sombre, le premier plan prend le jour
-    let g = c.createLinearGradient(0, y0, 0, y1);
-    g.addColorStop(0,    om(bed[0] * 0.76, bed[1] * 0.76, bed[2] * 0.80, 1));
-    g.addColorStop(0.42, om(bed[0], bed[1], bed[2], 1));
-    g.addColorStop(1,    om(bed[0] * 1.12, bed[1] * 1.11, bed[2] * 1.08, 1));
-    c.fillStyle = g; c.fillRect(0, y0, W, H);
+    // ================= 1. le lit de la voie =================
+    const gb = c.createLinearGradient(0, y0, 0, y1);
+    for (let i = 0; i <= 8; i++){
+      const s = i / 8, yy = y0 + H * s;
+      gb.addColorStop(s, K(loin(bedC, hzOf(1 / qOf(yy))), 1));
+    }
+    c.fillStyle = gb; c.fillRect(0, y0, W, H);
 
-    // ---------- pavage générique, réutilisé par quatre époques ----------
-    function pavage(cf, a, seed){
-      if (!cf || a < 0.012) return;
-      c.save();
-      c.globalAlpha = a;
-      c.lineJoin = "round"; c.lineCap = "butt";
-      let v = 0, row = 0;
-      while (v < 0.999 && row < 40){
-        let dv = cf.h * sc(v);
-        if (dv < 0.030) dv = 0.030;
-        const v1 = Math.min(1, v + dv);
-        const yT = yv(v), yB = yv(v1), rh = yB - yT;
-        const sm = sc((v + v1) * 0.5);
-        const wb = cf.h * cf.ar * H * sm;
-        const jw = wb * cf.jo, jh = rh * cf.jo;
-        let x = -wb * (0.15 + 0.75 * R(seed + row * 131));
-        const P = [];
-        let k = 0;
-        while (x < W + wb && k < 260){
-          const id = seed + row * 1009 + k * 37;
-          const w = wb * (1 + cf.irr * (R(id) - 0.5) * 1.35);
-          if (R(id + 5) < cf.de){
-            const rx = w * cf.ro, ry = rh * cf.ro * 1.7;
-            P.push([
-              x + jw * 0.5 + rx * (R(id + 11) - 0.5) * 2, yT + jh * 0.5 + ry * (R(id + 12) - 0.5) * 2,
-              x + w - jw * 0.5 + rx * (R(id + 13) - 0.5) * 2, yT + jh * 0.5 + ry * (R(id + 14) - 0.5) * 2,
-              x + w - jw * 0.5 + rx * (R(id + 15) - 0.5) * 2, yB - jh * 0.5 + ry * (R(id + 16) - 0.5) * 2,
-              x + jw * 0.5 + rx * (R(id + 17) - 0.5) * 2, yB - jh * 0.5 + ry * (R(id + 18) - 0.5) * 2,
-              id
-            ]);
-          }
-          x += w; k++;
-        }
-        // corps : chaque pierre a son ton propre, sinon le sol devient un damier
-        for (let i = 0; i < P.length; i++){
-          const p = P[i], id = p[8];
-          const tn = 1 + (R(id + 21) - 0.5) * cf.va;
-          const sh = (R(id + 23) - 0.5) * 0.09;
-          const cr = cf.co[0] * tn * (1 + sh), cg = cf.co[1] * tn, cb = cf.co[2] * tn * (1 - sh);
-          if (cf.gr){
-            const gg = c.createLinearGradient(p[2], p[3], p[6], p[7]);
-            gg.addColorStop(0, om(cr * 1.14, cg * 1.14, cb * 1.12, 1));
-            gg.addColorStop(1, om(cr * 0.84, cg * 0.85, cb * 0.88, 1));
-            c.fillStyle = gg;
-          } else {
-            c.fillStyle = om(cr, cg, cb, 1);
-          }
-          c.beginPath();
-          c.moveTo(p[0], p[1]); c.lineTo(p[2], p[3]); c.lineTo(p[4], p[5]); c.lineTo(p[6], p[7]);
-          c.closePath(); c.fill();
-        }
-        // reliefs groupés par rangée : deux traits au lieu de deux par pierre
-        const bw = Math.max(hair, rh * 0.075);
-        c.lineWidth = bw;
-        c.strokeStyle = om(cf.co[0] * 1.45 + 34, cf.co[1] * 1.45 + 32, cf.co[2] * 1.42 + 28, 0.55);
-        c.beginPath();
-        for (let i = 0; i < P.length; i++){
-          const p = P[i];
-          c.moveTo(p[0], p[1] + bw * 0.4); c.lineTo(p[2], p[3] + bw * 0.4); c.lineTo(p[4], p[5]);
-        }
-        c.stroke();
-        c.strokeStyle = om(0, 0, 0, 0.42);
-        c.beginPath();
-        for (let i = 0; i < P.length; i++){
-          const p = P[i];
-          c.moveTo(p[4], p[5] - bw * 0.4); c.lineTo(p[6], p[7] - bw * 0.4); c.lineTo(p[0], p[1]);
-        }
-        c.stroke();
-        if (cf.su){                                  // pierres enfoncées : la boue remonte dessus
-          c.strokeStyle = om(bed[0] * 0.55, bed[1] * 0.55, bed[2] * 0.6, 0.75);
-          c.lineWidth = bw * 2.2;
-          c.beginPath();
-          for (let i = 0; i < P.length; i++){
-            const p = P[i];
-            c.moveTo(p[6], p[7] + bw * 0.5); c.lineTo(p[4], p[5] + bw * 0.5);
-          }
-          c.stroke();
-        }
-        v = v1; row++;
+    // ================= 2. ornieres (epoque 0), sous le pavage =================
+    const wOrn = w6(0);
+    if (wOrn > 0.004){
+      for (let r = 0; r < 2; r++){
+        const dC = r ? 2.06 : 1.36, wd = 0.20 * dC;
+        const hz = hzOf(dC), sd = 3.1 + r * 2.4, on = H * 0.022;
+        // creux : coeur sombre, levre eclairee cote proche, fond le plus noir
+        nappeF(dC - wd * 0.5, dC + wd * 0.5, sd, on, mel(bedC, [22, 15, 9], 0.50), 0.88 * wOrn * (1 - hz * 0.5));
+        nappeF(dC + wd * 0.18, dC + wd * 0.5, sd, on, mel(bedC, [14, 10, 6], 0.62), 0.55 * wOrn * (1 - hz * 0.6));
+        nappeF(dC - wd * 0.62, dC - wd * 0.40, sd, on, mel(bedC, [255, 240, 208], 0.34), 0.50 * wOrn * (1 - hz * 0.8));
       }
-      c.restore();
+      // bourrelet central entre les deux traces
+      nappeF(1.56, 1.86, 8.4, H * 0.016, mel(bedC, [255, 238, 202], 0.20), 0.34 * wOrn);
     }
 
-    // ---------- semis de points groupés en un seul remplissage ----------
-    function semis(n, seed, col, a, taille, v0, v1){
-      c.fillStyle = om(col[0], col[1], col[2], a);
-      c.beginPath();
-      for (let i = 0; i < n; i++){
-        const v = v0 + (v1 - v0) * R(seed + i * 3);
-        const s = sc(v);
-        const r = hair * taille * s * RR(seed + i * 7 + 1, 0.5, 1.7);
-        c.rect(R(seed + i * 5 + 2) * W, yv(v), r, r * 0.75);
+    // ================= 3. le pavage =================
+    if (den > 0.02){
+      let NR = Math.round(24 / Math.max(0.3, szk));
+      NR = Math.max(7, Math.min(38, NR));
+      const rowD = (DF - 1) / NR;
+      const sw = rowD * 1.18;                        // pave un peu plus large que profond
+      const minRow = Math.max(0.85 * E, H * 0.010);
+
+      let kTop = -1;
+      for (let k = 0; k < NR; k++){
+        const dA = 1 + k * rowD;
+        if (CD * rowD / (dA * (dA + rowD)) < minRow) break;
+        kTop = k;
       }
-      c.fill();
+      // au-dela les rangees ne font plus un pixel : une seule nappe tient le fond
+      if (kTop < NR - 1){
+        const dm = (1 + (kTop + 1) * rowD + DF) * 0.5, hz = hzOf(dm);
+        c.fillStyle = K(loin(mel(joC, stC, 0.55), hz), den);
+        c.fillRect(0, y0 - 1, W, yOf(1 + (kTop + 1) * rowD) - y0 + 1.5);
+      }
+
+      for (let k = kTop; k >= 0; k--){
+        const dA = 1 + k * rowD, dB = dA + rowD;      // dA proche, dB lointain
+        const yB = yOf(dA), yT = yOf(dB), rowH = yB - yT;
+        const qT = 1 / dB, qM = 2 / (dA + dB);
+        const hz = hzOf((dA + dB) * 0.5);
+        const jw = jok * sw;
+
+        // fond de joint : aucun interstice ne laisse voir le lit
+        c.fillStyle = K(loin(joC, hz), den);
+        c.fillRect(0, yT - 0.45, W, rowH + 0.9);
+
+        const off = (k & 1 ? sw * 0.5 : 0) + irr * sw * (al(60000 + k) - 0.5) * 0.7;
+        const XM = Xmx(qT) + sw;
+        const k0 = Math.floor((-XM - off) / sw), k1 = Math.ceil((XM - off) / sw);
+        const relK = rel0 * Math.pow(qM, 1.30);
+        const bev = rowH >= 2.3 * E && relK > 0.05;
+        const fx = 1 - 0.22 * relK, fy = 1 - 0.34 * relK;
+        const lit = 0.40 * relK * (1 - hz * 0.78);
+        const dLo = dA + rowD * jok * 0.5, dHi = dB - rowD * jok * 0.5;
+        const ix = irr * sw * 0.22, id = irr * rowD * 0.22;
+
+        for (let kk = k0; kk <= k1; kk++){
+          const s0 = 70000 + k * 811 + (kk + 8192) * 17;
+          const bx = kk * sw + off, X0 = bx + jw * 0.5, X1 = bx + sw - jw * 0.5;
+          // quatre coins tires separement : les paves cessent d'etre un damier
+          const dHa = dHi + (al(s0)     - 0.5) * id, dHb = dHi + (al(s0 + 1) - 0.5) * id;
+          const dLc = dLo + (al(s0 + 2) - 0.5) * id, dLd = dLo + (al(s0 + 3) - 0.5) * id;
+          const qa = 1 / dHa, qb = 1 / dHb, qc = 1 / dLc, qd = 1 / dLd;
+          const xa = pxOf(X0 + (al(s0 + 4) - 0.5) * ix, qa), ya = yOf(dHa);
+          const xb = pxOf(X1 + (al(s0 + 5) - 0.5) * ix, qb), yb = yOf(dHb);
+          const xc = pxOf(X1 + (al(s0 + 6) - 0.5) * ix, qc), yc = yOf(dLc);
+          const xd = pxOf(X0 + (al(s0 + 7) - 0.5) * ix, qd), yd = yOf(dLd);
+          if ((xa < -3 && xb < -3 && xc < -3 && xd < -3) ||
+              (xa > W + 3 && xb > W + 3 && xc > W + 3 && xd > W + 3)) continue;
+
+          const v = (al(s0 + 8) - 0.5) * 2 * vaR;
+          const body = loin([stC[0] * (1 + v * 0.95), stC[1] * (1 + v * 0.88), stC[2] * (1 + v * 0.80)], hz);
+
+          if (!bev){
+            c.beginPath(); c.moveTo(xa, ya); c.lineTo(xb, yb); c.lineTo(xc, yc); c.lineTo(xd, yd); c.closePath();
+            c.fillStyle = K(body, den); c.fill();
+            continue;
+          }
+          const cx = (xa + xb + xc + xd) * 0.25, cy = (ya + yb + yc + yd) * 0.25;
+          const qax = cx + (xa - cx) * fx, qay = cy + (ya - cy) * fy;
+          const qbx = cx + (xb - cx) * fx, qby = cy + (yb - cy) * fy;
+          const qcx = cx + (xc - cx) * fx, qcy = cy + (yc - cy) * fy;
+          const qdx = cx + (xd - cx) * fx, qdy = cy + (yd - cy) * fy;
+
+          c.beginPath(); c.moveTo(xa, ya); c.lineTo(xb, yb); c.lineTo(xc, yc); c.lineTo(xd, yd); c.closePath();
+          c.fillStyle = K(mel(body, [16, 13, 11], lit), den); c.fill();
+          // lisere clair sur le haut et la droite, la lumiere vient de la
+          c.beginPath(); c.moveTo(xa, ya); c.lineTo(xb, yb); c.lineTo(xc, yc);
+          c.lineTo(qcx, qcy); c.lineTo(qbx, qby); c.lineTo(qax, qay); c.closePath();
+          c.fillStyle = K(mel(body, [255, 248, 232], lit * 0.92), den); c.fill();
+          c.beginPath(); c.moveTo(qax, qay); c.lineTo(qbx, qby); c.lineTo(qcx, qcy); c.lineTo(qdx, qdy); c.closePath();
+          c.fillStyle = K(body, den); c.fill();
+        }
+      }
     }
 
-    // ---------- 0 : terre battue ----------
-    function skinTerre(a){
-      if (a < 0.012) return;
-      c.save(); c.globalAlpha = a;
-      for (let i = 0; i < 80; i++){                 // plaques de terre plus ou moins tassée
-        const v = R(2000 + i * 3), s = sc(v);
-        const rx = H * RR(2200 + i, 0.14, 0.42) * s * 2.4;
-        const k = RR(2400 + i, -0.20, 0.22);
-        c.fillStyle = om(bed[0] * (1 + k), bed[1] * (1 + k * 0.9), bed[2] * (1 + k * 0.72), 0.5);
-        c.beginPath();
-        c.ellipse(R(2100 + i * 5) * W, yv(v), rx, rx * RR(2300 + i, 0.15, 0.30), 0, 0, TAU);
+    // ================= 4. bordures relevees (epoque 1) =================
+    const wBor = w6(1);
+    if (wBor > 0.004){
+      const kerb = mel(stC, [236, 230, 206], 0.30);
+      for (let s = 0; s < 2; s++){
+        const dL = s ? 2.62 : 1.000, dH = s ? DF + 0.2 : 1.085;
+        const hz = hzOf((dL + dH) * 0.5), on = H * 0.008;
+        nappeF(dL, dH, 5.7 + s * 3.3, on, mel(kerb, [10, 8, 6], 0.26), 0.95 * wBor * (1 - hz * 0.4));
+        nappeF(dL + (dH - dL) * 0.30, dH, 5.7 + s * 3.3, on, kerb, 0.95 * wBor * (1 - hz * 0.55));
+        nappeF(dH - (dH - dL) * 0.16, dH, 5.7 + s * 3.3, on, mel(kerb, [255, 252, 238], 0.55), 0.7 * wBor * (1 - hz * 0.8));
+      }
+      // l'ombre de la bordure du fond glisse sur la chaussee, jamais vers le haut
+      nappeF(2.30, 2.62, 9.1, H * 0.008, [20, 16, 12], 0.20 * wBor);
+    }
+
+    // ================= 5. boue et flaques (epoque 2) =================
+    const wBou = w6(2);
+    if (wBou > 0.004){
+      for (let i = 0; i < 26; i++){
+        const d = 1 + al(11000 + i * 5) * (DF - 1);
+        const q = 1 / d, yy = yOf(d), hz = hzOf(d);
+        const xx = pxOf((al(11001 + i * 5) - 0.5) * 2 * Xmx(q), q);
+        const rx = H * (0.10 + al(11002 + i * 5) * 0.22) * q * 2.4;
+        posee(xx, yy, rx, 1);
+        c.fillStyle = K(loin(mel(bedC, [18, 13, 9], 0.42), hz), 0.52 * wBou);
+        c.fill();
+        posee(xx + rx * 0.16, yy - rx * FLAT * q * 0.34, rx * 0.62, 1);
+        c.fillStyle = K(loin(mel(bedC, [40, 30, 20], 0.30), hz), 0.34 * wBou);
         c.fill();
       }
-      semis(520, 2600, [40, 28, 16], 0.26, 1.0, 0, 1);
-      semis(420, 3000, [232, 210, 172], 0.20, 0.9, 0, 1);
-      c.restore();
-    }
-
-    // ---------- 2 : boue ----------
-    function skinBoue(a){
-      if (a < 0.012) return;
-      c.save(); c.globalAlpha = a;
-      for (let i = 0; i < 46; i++){                 // gadoue brassée, luisante par plaques
-        const v = R(3400 + i * 3), s = sc(v);
-        const rx = H * RR(3500 + i, 0.16, 0.50) * s * 2.4;
-        const k = RR(3600 + i, -0.28, 0.16);
-        c.fillStyle = om(bed[0] * (1 + k), bed[1] * (1 + k), bed[2] * (1 + k * 1.2), 0.55);
-        c.beginPath(); c.ellipse(R(3700 + i * 5) * W, yv(v), rx, rx * 0.24, 0, 0, TAU); c.fill();
-      }
-      pavage(PAV[2], 1, 4100);
-      c.strokeStyle = om(255, 246, 224, 0.13);      // reflets gras sur la boue mouillée
-      c.lineWidth = hair * 1.4; c.lineCap = "round";
-      c.beginPath();
-      for (let i = 0; i < 60; i++){
-        const v = R(4400 + i * 3), s = sc(v), x = R(4500 + i * 5) * W;
-        const L = H * RR(4600 + i, 0.06, 0.20) * s * 2;
-        c.moveTo(x, yv(v)); c.lineTo(x + L, yv(v) + L * RR(4700 + i, -0.10, 0.10));
-      }
-      c.stroke();
-      semis(180, 4800, [186, 162, 108], 0.30, 1.3, 0, 1);   // paille et débris
-      c.restore();
-    }
-
-    // ---------- 4 : bitume ----------
-    function skinBitume(a){
-      if (a < 0.012) return;
-      c.save(); c.globalAlpha = a;
-      const g2 = c.createLinearGradient(0, y0, 0, y1);
-      g2.addColorStop(0, om(44, 44, 48, 1));
-      g2.addColorStop(0.5, om(58, 58, 62, 1));
-      g2.addColorStop(1, om(74, 73, 76, 1));
-      c.fillStyle = g2; c.fillRect(0, y0, W, H);
-      for (let i = 0; i < 8; i++){                  // rustines : le bitume est toujours rapiécé
-        const cx = R(5000 + i * 3) * W, cv = RR(5100 + i, 0.06, 0.92);
-        const s = sc(cv), rx = H * RR(5200 + i, 0.10, 0.30) * s * 2.4, ry = rx * 0.34;
-        c.fillStyle = om(38, 38, 42, 0.75);
-        c.beginPath();
-        for (let k = 0; k <= 10; k++){
-          const an = k / 10 * TAU, rr = 1 + (R(5300 + i * 13 + k) - 0.5) * 0.34;
-          const px = cx + Math.cos(an) * rx * rr, py = yv(cv) + Math.sin(an) * ry * rr;
-          if (k === 0) c.moveTo(px, py); else c.lineTo(px, py);
-        }
-        c.closePath(); c.fill();
-        c.strokeStyle = om(22, 22, 24, 0.8); c.lineWidth = hair * 1.2; c.stroke();
-      }
-      semis(1100, 5600, [176, 176, 180], 0.26, 1.0, 0, 1);  // granulat clair
-      semis(700, 6000, [14, 14, 16], 0.34, 1.1, 0, 1);      // granulat sombre
-      c.lineCap = "round";
-      for (let i = 0; i < 9; i++){                  // fissures colmatées, luisantes
-        const vv = RR(6300 + i, 0.05, 0.95), s = sc(vv);
-        let px = R(6400 + i * 3) * W, py = yv(vv);
-        c.beginPath(); c.moveTo(px, py);
-        for (let k = 0; k < 9; k++){
-          px += H * RR(6500 + i * 11 + k, 0.05, 0.22) * s * 2;
-          py += H * RR(6600 + i * 11 + k, -0.05, 0.05) * s * 2;
-          c.lineTo(px, py);
-        }
-        c.strokeStyle = om(26, 26, 28, 0.85); c.lineWidth = hair * 2.4; c.stroke();
-        c.strokeStyle = om(96, 96, 100, 0.35); c.lineWidth = hair * 0.8; c.stroke();
-      }
-      c.restore();
-    }
-
-    // ---------- 5 : dalle lisse ----------
-    function skinDalle(a){
-      if (a < 0.012) return;
-      c.save(); c.globalAlpha = a;
-      pavage(PAV[5], 1, 7000);
-      const g3 = c.createLinearGradient(W * 0.75, y0, W * 0.1, y1);
-      g3.addColorStop(0, om(255, 255, 255, 0.16));  // le poli renvoie le ciel du haut-droite
-      g3.addColorStop(1, om(255, 255, 255, 0));
-      c.fillStyle = g3; c.fillRect(0, y0, W, H);
-      semis(260, 7300, [255, 255, 255], 0.28, 0.8, 0, 1);
-      c.restore();
-    }
-
-    skinTerre(w6(0));
-    pavage(PAV[1], w6(1), 8000);
-    skinBoue(w6(2));
-    pavage(PAV[3], w6(3), 8600);
-    skinBitume(w6(4));
-    skinDalle(w6(5));
-
-    // la voie romaine est bombée : le milieu prend le jour, les rives s'assombrissent
-    if (w6(1) > 0.01){
-      c.save(); c.globalAlpha = w6(1);
-      const gb = c.createLinearGradient(0, y0, 0, y1);
-      gb.addColorStop(0, om(0, 0, 0, 0.22));
-      gb.addColorStop(0.44, om(255, 250, 232, 0.14));
-      gb.addColorStop(1, om(0, 0, 0, 0.20));
-      c.fillStyle = gb; c.fillRect(0, y0, W, H);
-      c.restore();
-    }
-
-    // ---------- usure du passage : deux voies polies et un axe tassé ----------
-    (function usure(){
-      const li = mx(WLI), da = mx(WDA);
-      const voies = [0.36, 0.70];
-      for (let i = 0; i < voies.length; i++){
-        const vv = voies[i], s = sc(vv), hw = H * 0.10 * s * 2;
-        const gu = c.createLinearGradient(0, yv(vv) - hw, 0, yv(vv) + hw);
-        gu.addColorStop(0, om(0, 0, 0, 0));
-        gu.addColorStop(0.5, om(0, 0, 0, da * 0.55));
-        gu.addColorStop(1, om(0, 0, 0, 0));
-        c.fillStyle = gu; c.fillRect(0, yv(vv) - hw, W, hw * 2);
-        const gl = c.createLinearGradient(0, yv(vv) - hw * 0.45, 0, yv(vv) + hw * 0.45);
-        gl.addColorStop(0, om(255, 248, 230, 0));
-        gl.addColorStop(0.5, om(255, 248, 230, li));
-        gl.addColorStop(1, om(255, 248, 230, 0));
-        c.fillStyle = gl; c.fillRect(0, yv(vv) - hw * 0.45, W, hw * 0.9);
-      }
-    })();
-
-    // ---------- ornières ----------
-    (function ornieres(){
-      const d = mx(RUT);
-      if (d < 0.015) return;
-      c.save(); c.lineCap = "round";
-      const voies = [0.36, 0.70];
-      for (let i = 0; i < voies.length; i++){
-        const vv = voies[i], s = sc(vv), yc = yv(vv);
-        const hw = H * 0.055 * s * 2 * (0.7 + d * 0.6);
-        const amp = hw * 0.55, ph = i * 2.1 + 0.7;
-        c.strokeStyle = om(0, 0, 0, 0.30 * d); c.lineWidth = hw * 1.9;
-        ligne(yc, amp, ph); c.stroke();
-        c.strokeStyle = om(0, 0, 0, 0.26 * d); c.lineWidth = hw * 0.8;
-        ligne(yc + hw * 0.28, amp, ph); c.stroke();
-        c.strokeStyle = om(255, 240, 214, 0.24 * d); c.lineWidth = hw * 0.40;
-        ligne(yc - hw * 1.05, amp, ph); c.stroke();   // lèvre haute, face à la lumière
-        c.strokeStyle = om(0, 0, 0, 0.20 * d); c.lineWidth = hw * 0.34;
-        ligne(yc + hw * 1.10, amp, ph); c.stroke();
-      }
-      c.restore();
-    })();
-
-    // ---------- flaques : elles rendent le ciel ----------
-    (function flaques(){
-      const p = mx(PUD);
-      if (p < 0.025) return;
-      for (let i = 0; i < 16; i++){
-        if (R(9000 + i * 5) > p) continue;
-        const lane = R(9100 + i) < 0.5 ? 0.36 : 0.70;
-        const vv = Math.max(0.05, Math.min(0.95, lane + (R(9200 + i) - 0.5) * 0.12));
-        const s = sc(vv), yc = yv(vv), x = R(9300 + i * 7) * W;
-        const rx = H * RR(9400 + i, 0.06, 0.19) * s * 2.6, ry = rx * RR(9500 + i, 0.15, 0.26);
-        c.save();
-        c.beginPath(); c.ellipse(x, yc, rx, ry, 0, 0, TAU); c.clip();
-        const gw = c.createLinearGradient(0, yc - ry, 0, yc + ry);
-        gw.addColorStop(0, om(150, 176, 200, 0.92));   // bord lointain : le ciel s'y couche
-        gw.addColorStop(0.55, om(96, 112, 122, 0.85));
-        gw.addColorStop(1, om(52, 54, 50, 0.80));
-        c.fillStyle = gw; c.fillRect(x - rx, yc - ry, rx * 2, ry * 2);
-        c.strokeStyle = om(226, 238, 250, 0.5); c.lineWidth = hair;
-        for (let k = 0; k < 3; k++){                   // rides
-          c.beginPath();
-          c.ellipse(x + rx * 0.1, yc + ry * (k * 0.36 - 0.3), rx * (0.3 + k * 0.22), ry * 0.14, 0, 0, TAU);
-          c.stroke();
-        }
-        c.restore();
-        c.lineWidth = hair * 1.5;
-        c.strokeStyle = om(255, 250, 236, 0.42);       // liseré mouillé au haut-droite
-        c.beginPath(); c.ellipse(x, yc, rx, ry, 0, -2.0, 0.35); c.stroke();
-        c.strokeStyle = om(0, 0, 0, 0.38);
-        c.beginPath(); c.ellipse(x, yc, rx, ry, 0, 0.5, 2.9); c.stroke();
-      }
-    })();
-
-    // ---------- cailloux libres ----------
-    (function cailloux(){
-      const a = mx(PEB);
-      if (a < 0.02) return;
-      c.save(); c.globalAlpha = a;
-      const P = [];
-      for (let i = 0; i < 120; i++){
-        const vv = R(10000 + i * 3), s = sc(vv);
-        P.push([R(10100 + i * 5) * W, yv(vv), H * RR(10200 + i, 0.008, 0.024) * s * 2, i]);
-      }
-      for (let i = 0; i < P.length; i++){
-        const p = P[i], k = RR(10300 + p[3], 0.75, 1.25);
-        c.fillStyle = om(146 * k, 134 * k, 112 * k, 0.9);
-        c.beginPath(); c.ellipse(p[0], p[1], p[2], p[2] * 0.72, 0, 0, TAU); c.fill();
-      }
-      c.strokeStyle = om(255, 246, 226, 0.5); c.lineWidth = hair * 0.9;
-      c.beginPath();
-      for (let i = 0; i < P.length; i++){
-        const p = P[i];
-        c.moveTo(p[0] - p[2] * 0.7, p[1] - p[2] * 0.35);
-        c.lineTo(p[0] + p[2] * 0.55, p[1] - p[2] * 0.6);
-      }
-      c.stroke();
-      c.strokeStyle = om(0, 0, 0, 0.42);
-      c.beginPath();
-      for (let i = 0; i < P.length; i++){
-        const p = P[i];
-        c.moveTo(p[0] - p[2] * 0.8, p[1] + p[2] * 0.5);
-        c.lineTo(p[0] + p[2] * 0.7, p[1] + p[2] * 0.62);
-      }
-      c.stroke();
-      c.restore();
-    })();
-
-    // ---------- empreintes de pas ----------
-    (function empreintes(){
-      const a = w6(0) + w6(2) * 0.55;
-      if (a < 0.02) return;
-      c.save(); c.globalAlpha = Math.min(1, a);
-      for (let i = 0; i < 34; i++){
-        const vv = 0.28 + R(11000 + i * 3) * 0.46, s = sc(vv);
-        const x = ((i * 0.1379 + R(11100 + i) * 0.06) % 1) * W;
-        const L = H * 0.075 * s * 2.1, Wd = L * 0.42;
-        const yy = yv(vv) + (i % 2 ? 1 : -1) * Wd * 0.7;
-        c.save();
-        c.translate(x, yy); c.rotate(RR(11200 + i, -0.18, 0.18));
-        c.fillStyle = om(0, 0, 0, 0.32);
-        c.beginPath(); c.ellipse(0, 0, L * 0.32, Wd * 0.5, 0, 0, TAU); c.fill();
-        c.beginPath(); c.ellipse(-L * 0.40, 0, L * 0.16, Wd * 0.40, 0, 0, TAU); c.fill();
-        c.strokeStyle = om(255, 240, 212, 0.30); c.lineWidth = hair * 1.3;
-        c.beginPath();                                // bourrelet de terre repoussée
-        c.ellipse(0, -hair, L * 0.32, Wd * 0.5, 0, Math.PI * 1.05, Math.PI * 1.98);
-        c.stroke();
-        c.restore();
-      }
-      c.restore();
-    })();
-
-    // ---------- rails de tramway hippomobile ----------
-    (function rails(){
-      const a = w6(3);
-      if (a < 0.02) return;
-      c.save(); c.globalAlpha = a;
-      const vc = 0.70, demi = 0.038;
-      for (let i = 0; i < 2; i++){
-        const vv = vc + (i ? demi : -demi), s = sc(vv), yc = yv(vv);
-        const th = H * 0.020 * s * 2;
-        c.lineCap = "butt";
-        c.strokeStyle = om(150, 146, 140, 0.85); c.lineWidth = th * 3.4;   // pierres d'accotement
-        ligne(yc, 0, 0); c.stroke();
-        c.strokeStyle = om(0, 0, 0, 0.45); c.lineWidth = th * 1.9;
-        ligne(yc + th * 0.55, 0, 0); c.stroke();
-        c.strokeStyle = om(96, 96, 100, 1); c.lineWidth = th * 1.5;        // champignon d'acier
-        ligne(yc, 0, 0); c.stroke();
-        c.strokeStyle = om(226, 230, 236, 0.9); c.lineWidth = th * 0.42;   // poli du roulement
-        ligne(yc - th * 0.42, 0, 0); c.stroke();
-        c.strokeStyle = om(18, 18, 20, 0.95); c.lineWidth = th * 0.44;     // rainure du boudin
-        ligne(yc + th * 0.30, 0, 0); c.stroke();
-      }
-      c.restore();
-    })();
-
-    // ---------- caniveau ----------
-    (function caniveau(){
-      const a = mx(GUT);
-      if (a < 0.02) return;
-      c.save(); c.globalAlpha = a;
-      const vv = mx(KH) + 0.070, s = sc(vv), yc = yv(vv), th = H * 0.026 * s * 2;
-      c.lineCap = "butt";
-      c.strokeStyle = om(0, 0, 0, 0.42); c.lineWidth = th * 2.6;
-      ligne(yc, th * 0.4, 3.1); c.stroke();
-      c.strokeStyle = om(30, 34, 34, 0.55); c.lineWidth = th * 0.9;
-      ligne(yc + th * 0.2, th * 0.4, 3.1); c.stroke();
-      c.strokeStyle = om(196, 208, 214, 0.45); c.lineWidth = th * 0.34;    // filet d'eau
-      ligne(yc - th * 0.05, th * 0.4, 3.1); c.stroke();
-      c.strokeStyle = om(255, 250, 236, 0.30); c.lineWidth = th * 0.30;
-      ligne(yc - th * 1.25, th * 0.4, 3.1); c.stroke();
-      c.restore();
-    })();
-
-    // ---------- bouches d'égout ----------
-    (function egouts(){
-      const a = w6(3) * 0.35 + w6(4) + w6(5) * 0.45;
-      if (a < 0.02) return;
-      c.save(); c.globalAlpha = Math.min(1, a);
-      const pos = [[0.17, 0.24], [0.72, 0.20], [0.47, 0.80]];
-      for (let i = 0; i < pos.length; i++){
-        const x = pos[i][0] * W, vv = pos[i][1], yc = yv(vv), s = sc(vv);
-        const rx = H * 0.15 * s * 2, ry = rx * 0.40;
-        c.fillStyle = om(20, 20, 22, 0.9);
-        c.beginPath(); c.ellipse(x, yc, rx * 1.12, ry * 1.12, 0, 0, TAU); c.fill();
-        const gr = c.createRadialGradient(x + rx * 0.3, yc - ry * 0.5, ry * 0.15, x, yc, rx * 1.05);
-        gr.addColorStop(0, om(126, 122, 116, 1));
-        gr.addColorStop(0.6, om(88, 86, 84, 1));
-        gr.addColorStop(1, om(54, 52, 52, 1));
-        c.fillStyle = gr;
-        c.beginPath(); c.ellipse(x, yc, rx, ry, 0, 0, TAU); c.fill();
-        c.save();                                    // damier de fonte
-        c.beginPath(); c.ellipse(x, yc, rx * 0.86, ry * 0.86, 0, 0, TAU); c.clip();
-        c.strokeStyle = om(38, 36, 36, 0.8); c.lineWidth = hair * 1.2;
-        c.beginPath();
-        for (let k = -7; k <= 7; k++){
-          const o = k * rx * 0.15;
-          c.moveTo(x + o - rx, yc + ry * 1.3); c.lineTo(x + o + rx, yc - ry * 1.3);
-          c.moveTo(x + o - rx, yc - ry * 1.3); c.lineTo(x + o + rx, yc + ry * 1.3);
-        }
-        c.stroke();
-        c.restore();
-        c.lineWidth = hair * 1.7;
-        c.strokeStyle = om(236, 234, 226, 0.5);
-        c.beginPath(); c.ellipse(x, yc, rx * 0.97, ry * 0.97, 0, -2.0, 0.3); c.stroke();
-        c.strokeStyle = om(0, 0, 0, 0.55);
-        c.beginPath(); c.ellipse(x, yc, rx * 0.97, ry * 0.97, 0, 0.45, 2.95); c.stroke();
-        c.strokeStyle = om(0, 0, 0, 0.7); c.lineWidth = hair * 1.4;
-        c.beginPath(); c.moveTo(x - rx * 0.12, yc); c.lineTo(x + rx * 0.12, yc); c.stroke();
-      }
-      c.restore();
-    })();
-
-    // ---------- marquage central ----------
-    (function marquage(){
-      const a = w6(4);
-      if (a < 0.02) return;
-      c.save(); c.globalAlpha = a;
-      const vv = 0.50, yc = yv(vv), s = sc(vv);
-      const th = H * 0.026 * s * 2, pas = H * 1.05, tir = pas * 0.52;
-      for (let x = -tir; x < W + tir; x += pas){
-        const id = (x / pas) | 0;
-        const use = RR(12000 + id, 0.55, 1);        // peinture inégalement usée
-        c.fillStyle = om(238, 232, 208, 0.92 * use);
-        c.fillRect(x, yc - th * 0.5, tir, th);
-        c.fillStyle = om(255, 252, 240, 0.5 * use);
-        c.fillRect(x, yc - th * 0.5, tir, th * 0.32);
-        c.fillStyle = om(0, 0, 0, 0.22);            // le film de peinture porte son ombre
-        c.fillRect(x, yc + th * 0.34, tir, th * 0.22);
-      }
-      const bords = [mx(KH) + 0.10, 0.93];
-      for (let i = 0; i < bords.length; i++){
-        const yb = yv(bords[i]), tb = H * 0.016 * sc(bords[i]) * 2;
-        c.fillStyle = om(232, 226, 204, 0.7);
-        c.fillRect(0, yb - tb * 0.5, W, tb);
-      }
-      c.restore();
-    })();
-
-    // ---------- rainures de guidage lumineuses ----------
-    (function rainures(){
-      const a = w6(5);
-      if (a < 0.02) return;
-      const vs = [0.32, 0.52, 0.72];
-      c.save(); c.globalAlpha = a; c.lineCap = "butt";
-      for (let i = 0; i < vs.length; i++){
-        const yc = yv(vs[i]), th = H * 0.014 * sc(vs[i]) * 2;
-        c.strokeStyle = om(96, 108, 118, 0.85); c.lineWidth = th * 1.6;   // creux de la rainure
-        ligne(yc, 0, 0); c.stroke();
-        c.strokeStyle = om(226, 236, 244, 0.5); c.lineWidth = th * 0.34;
-        ligne(yc - th * 0.75, 0, 0); c.stroke();
-      }
-      c.globalCompositeOperation = "lighter";
-      for (let i = 0; i < vs.length; i++){
-        const yc = yv(vs[i]), th = H * 0.014 * sc(vs[i]) * 2;
-        const inten = 0.30 + 0.55 * N;
-        const gh = c.createLinearGradient(0, yc - th * 5, 0, yc + th * 5);
-        gh.addColorStop(0, "rgba(120,236,255,0)");
-        gh.addColorStop(0.5, "rgba(120,236,255," + (0.34 * inten) + ")");
-        gh.addColorStop(1, "rgba(120,236,255,0)");
-        c.fillStyle = gh; c.fillRect(0, yc - th * 5, W, th * 10);
-        c.strokeStyle = "rgba(216,250,255," + (0.85 * inten) + ")";
-        c.lineWidth = th * 0.5;
-        ligne(yc, 0, 0); c.stroke();
-      }
-      c.restore();
-    })();
-
-    // ---------- bordures : du fond on voit la face, du bord bas le dessus ----------
-    (function bordures(){
-      const kh = mx(KH);
-      if (kh < 0.005) return;
-      const kc = mc(KC);
-      const hTot = H * kh, hTop = hTot * 0.38, hFac = hTot - hTop;
-      // bordure du fond
-      c.fillStyle = om(kc[0] * 1.16, kc[1] * 1.16, kc[2] * 1.14, 1);
-      c.fillRect(0, y0, W, hTop);
-      const gf = c.createLinearGradient(0, y0 + hTop, 0, y0 + hTot);
-      gf.addColorStop(0, om(kc[0] * 0.80, kc[1] * 0.80, kc[2] * 0.82, 1));
-      gf.addColorStop(1, om(kc[0] * 0.56, kc[1] * 0.56, kc[2] * 0.60, 1));
-      c.fillStyle = gf; c.fillRect(0, y0 + hTop, W, hFac);
-      c.fillStyle = om(255, 250, 232, 0.34);        // arête vive éclairée
-      c.fillRect(0, y0 + hTop - hair, W, hair * 1.2);
-      c.fillStyle = om(0, 0, 0, 0.34);              // contact avec la chaussée
-      c.fillRect(0, y0 + hTot, W, hTot * 0.16);
-      // bordure du bord bas : vue de dessus
-      const hBas = hTot * 0.72;
-      const gb2 = c.createLinearGradient(0, y1 - hBas, 0, y1);
-      gb2.addColorStop(0, om(kc[0] * 0.92, kc[1] * 0.92, kc[2] * 0.94, 1));
-      gb2.addColorStop(1, om(kc[0] * 1.22, kc[1] * 1.20, kc[2] * 1.16, 1));
-      c.fillStyle = gb2; c.fillRect(0, y1 - hBas, W, hBas);
-      c.fillStyle = om(0, 0, 0, 0.30);
-      c.fillRect(0, y1 - hBas, W, hair * 1.4);
-      // joints entre pierres de bordure
-      c.strokeStyle = om(0, 0, 0, 0.45); c.lineWidth = hair;
-      c.beginPath();
-      const pasB = H * 0.95;
-      for (let x = 0; x < W + pasB; x += pasB){
-        const jx = x + RR(13000 + (x / pasB | 0), -0.2, 0.2) * pasB;
-        c.moveTo(jx, y0); c.lineTo(jx - hTot * 0.14, y0 + hTot);
-        c.moveTo(jx + pasB * 0.4, y1 - hBas); c.lineTo(jx + pasB * 0.4, y1);
-      }
-      c.stroke();
-    })();
-
-    // ---------- herbe qui reprend sur les rives ----------
-    (function herbe(){
-      const a = mx(GRS);
-      if (a < 0.02) return;
-      c.save(); c.globalAlpha = a; c.lineCap = "round";
-      for (let pass = 0; pass < 2; pass++){
-        c.strokeStyle = pass ? om(124, 148, 74, 0.75) : om(72, 92, 46, 0.85);
-        c.lineWidth = hair * (pass ? 0.9 : 1.3);
-        c.beginPath();
-        for (let i = 0; i < 200; i++){
-          const bas = i % 2;
-          const vv = bas ? 0.995 - R(14000 + i) * 0.05 : 0.005 + R(14100 + i) * 0.05;
-          const s = sc(vv), bx = R(14200 + i * 3 + pass * 7) * W, by = yv(vv);
-          const hg = H * RR(14300 + i + pass * 11, 0.03, 0.085) * s * 2;
-          const dx = hg * RR(14400 + i, -0.55, 0.55);
-          c.moveTo(bx, by);
-          c.quadraticCurveTo(bx + dx * 0.4, by - hg * 0.7, bx + dx, by - hg);
-        }
-        c.stroke();
-      }
-      c.restore();
-    })();
-
-    /* ---------- flaques de lumière : elles restent sur la chaussée ---------- */
-    const LAMPX = W * 0.20, FONTX = W * 0.63;
-    const wTor = w6(0) + w6(1), wGaz = w6(2) + w6(3), wEle = w6(4), wBor = w6(5);
-    const flam = 0.84 + Math.sin(t * 11.3) * 0.10 + Math.sin(t * 23.7) * 0.06;
-
-    function flaqueLum(x, col, inten, port){
-      if (inten <= 0.005) return;
-      c.save();
-      c.globalCompositeOperation = "lighter";
-      const yc = y0 + H * 0.42, rx = H * port;
-      c.translate(x, yc); c.scale(1, 0.34); c.translate(-x, -yc);
-      const gl = c.createRadialGradient(x, yc, 0, x, yc, rx);
-      gl.addColorStop(0, "rgba(" + col + "," + (0.42 * inten) + ")");
-      gl.addColorStop(0.34, "rgba(" + col + "," + (0.17 * inten) + ")");
-      gl.addColorStop(0.7, "rgba(" + col + "," + (0.05 * inten) + ")");
-      gl.addColorStop(1, "rgba(" + col + ",0)");
-      c.fillStyle = gl;
-      c.beginPath(); c.arc(x, yc, rx, 0, TAU); c.fill();
-      c.restore();
-    }
-    flaqueLum(LAMPX, "255,168,78", wTor * N * flam, 1.5);
-    flaqueLum(LAMPX, "255,206,132", wGaz * N, 1.7);
-    flaqueLum(LAMPX, "244,246,236", wEle * N, 2.2);
-    flaqueLum(LAMPX, "142,236,255", wBor * N, 1.5);
-
-    c.restore();                                     // fin du clip de la bande
-
-    /* ================= 2. le mobilier, posé sur le bord haut ================= */
-    const ySit = y0 + H * 0.045;
-
-    // cylindre éclairé par la droite : sert aux fûts, bornes et colonnes
-    function cyl(x, yT, yB, hw, col){
-      const gc = c.createLinearGradient(x - hw, 0, x + hw, 0);
-      for (let i = 0; i <= 6; i++){
-        const f = i / 6, k = Math.max(0, Math.cos((f - 0.5) * Math.PI - 0.5));
-        const s = 0.26 + 0.98 * k * k;
-        gc.addColorStop(f, om(col[0] * s, col[1] * s, col[2] * s, 1));
-      }
-      c.fillStyle = gc; c.fillRect(x - hw, yT, hw * 2, yB - yT);
-    }
-    function contact(x, y, r){
-      c.fillStyle = om(0, 0, 0, 0.34);
-      c.beginPath(); c.ellipse(x - r * 0.25, y, r, r * 0.26, 0, 0, TAU); c.fill();
-    }
-
-    // ---------- torche ----------
-    function torche(x, a){
-      if (a < 0.02) return;
-      c.save(); c.globalAlpha = a;
-      const ht = PH * 2.5, hw = PH * 0.075;
-      contact(x, ySit, hw * 4);
-      cyl(x, ySit - ht, ySit, hw, [96, 68, 42]);
-      c.strokeStyle = om(46, 40, 34, 0.9); c.lineWidth = hw * 0.5;
-      for (let i = 0; i < 2; i++){                   // frettes de fer
-        c.beginPath();
-        c.moveTo(x - hw, ySit - ht * (0.86 - i * 0.12));
-        c.lineTo(x + hw, ySit - ht * (0.86 - i * 0.12));
-        c.stroke();
-      }
-      const yh = ySit - ht;
-      c.fillStyle = om(34, 28, 24, 1);               // faisceau de brandons poissés
-      c.beginPath();
       for (let i = 0; i < 9; i++){
-        const an = -Math.PI * 0.5 + (i / 8 - 0.5) * 2.1;
-        const L = hw * RR(15000 + i, 2.6, 4.6);
-        c.moveTo(x, yh + hw);
-        c.lineTo(x + Math.cos(an) * L * 0.4, yh + Math.sin(an) * L * 0.4);
-        c.lineTo(x + Math.cos(an + 0.16) * L, yh + Math.sin(an + 0.16) * L);
-        c.closePath();
+        const d = 1 + al(12000 + i * 4) * (DF - 1) * 0.92;
+        const q = 1 / d, yy = yOf(d), hz = hzOf(d);
+        const xx = pxOf((al(12001 + i * 4) - 0.5) * 2 * Xmx(q), q);
+        const rx = H * (0.09 + al(12002 + i * 4) * 0.16) * q * 2.6;
+        posee(xx, yy, rx, 1);
+        c.fillStyle = K(loin([26, 24, 22], hz), 0.62 * wBou * wet); c.fill();
+        // le ciel se couche dans la flaque : une trainee laterale, pas verticale
+        posee(xx - rx * 0.10, yy - rx * FLAT * q * 0.30, rx * 0.74, 0.58);
+        c.fillStyle = K(loin([150, 168, 192], hz), 0.34 * wBou * wet); c.fill();
+        posee(xx, yy + rx * FLAT * q * 0.66, rx * 0.96, 0.30);
+        c.fillStyle = K(loin(mel(bedC, [255, 246, 220], 0.42), hz), 0.26 * wBou); c.fill();
       }
+    }
+
+    // ================= 6. caniveau et plaque (epoque 3) =================
+    const wCan = w6(3);
+    if (wCan > 0.004){
+      const dC = 1.145, wd = 0.055;
+      const hz = hzOf(dC);
+      nappeF(dC - wd, dC + wd, 4.4, H * 0.006, mel(joC, [10, 10, 12], 0.55), 0.92 * wCan);
+      nappeF(dC + wd * 0.30, dC + wd, 4.4, H * 0.006, [8, 9, 11], 0.55 * wCan);
+      nappeF(dC - wd * 1.55, dC - wd, 4.4, H * 0.006, mel(stC, [255, 250, 236], 0.45), 0.48 * wCan);
+      // filet d'eau au fond du caniveau
+      nappeF(dC - wd * 0.30, dC + wd * 0.35, 4.4, H * 0.006, [64, 86, 96], 0.34 * wCan * wet);
+
+      for (let i = 0; i < 2; i++){
+        const d = 1.30 + i * 0.62, q = 1 / d, yy = yOf(d), h2 = hzOf(d);
+        const xx = pxOf((al(13000 + i) - 0.5) * 1.4 * Xmx(q), q);
+        const rx = H * 0.19 * q * 2.4;
+        posee(xx - rx * 0.22, yy + rx * FLAT * q * 0.22, rx * 1.12, 1);
+        c.fillStyle = K([14, 12, 10], 0.26 * wCan); c.fill();
+        posee(xx, yy, rx, 1); c.fillStyle = K(loin([84, 82, 80], h2), 0.95 * wCan); c.fill();
+        posee(xx, yy, rx * 0.82, 1); c.fillStyle = K(loin([64, 62, 60], h2), 0.9 * wCan); c.fill();
+        for (let j = 0; j < 7; j++){
+          const fr = (j + 0.5) / 7;
+          posee(xx, yy - rx * FLAT * q * (0.72 - fr * 1.44), rx * 0.78, 0.06);
+          c.fillStyle = K(loin([116, 114, 110], h2), 0.5 * wCan); c.fill();
+        }
+        posee(xx, yy - rx * FLAT * q * 0.62, rx * 0.9, 0.10);
+        c.fillStyle = K(loin([150, 148, 142], h2), 0.45 * wCan); c.fill();
+      }
+    }
+
+    // ================= 7. bitume : marquage et usure (epoque 4) =================
+    const wBit = w6(4);
+    if (wBit > 0.004){
+      for (let i = 0; i < 2; i++){                    // bandes polies par les roues
+        const d = 1.26 + i * 0.66;
+        nappeF(d - 0.16, d + 0.16, 6.2 + i * 2.1, H * 0.010,
+               mel(bedC, [190, 192, 196], 0.34), 0.22 * wBit * (1 - hzOf(d) * 0.5));
+      }
+      for (let i = 0; i < 4; i++){                    // reprises d'enrobe
+        const d = 1.08 + al(14000 + i) * (DF - 1.2);
+        nappeF(d - 0.035, d + 0.035, 12.3 + i * 4.7, H * 0.014,
+               mel(bedC, [16, 16, 18], 0.55), 0.55 * wBit * (1 - hzOf(d) * 0.6));
+      }
+      const paint = [236, 232, 216];
+      const rail = (d, dl, dg, a) => {
+        const q = 1 / d, yy = yOf(d), hz = hzOf(d);
+        const th = Math.max(hair, 0.085 * CD * q * q);
+        const XM = Xmx(q), per = dl + dg;
+        const n = Math.ceil(XM / per) + 1;
+        for (let i = -n; i <= n; i++){
+          const xa = pxOf(i * per, q), xb = pxOf(i * per + dl, q);
+          if (xb < -2 || xa > W + 2) continue;
+          const wear = 0.55 + 0.45 * al(31000 + i * 3 + Math.round(d * 10));
+          c.fillStyle = K(loin(paint, hz), a * wear * wBit * (1 - hz * 0.35));
+          c.fillRect(xa, yy - th * 0.5, xb - xa, th);
+        }
+      };
+      rail(1.50, 0.44, 0.36, 0.92);                   // marquage central
+      rail(1.055, 9e3, 0, 0.55); rail(2.78, 9e3, 0, 0.5);
+    }
+
+    // ================= 8. rainures lumineuses (epoque 5) =================
+    const wRai = w6(5);
+    const RAIN = [1.172, 1.500, 2.083];
+    if (wRai > 0.004){
+      for (let i = 0; i < RAIN.length; i++){
+        const d = RAIN[i], q = 1 / d, hz = hzOf(d);
+        const wd = 0.05 * d;
+        nappeF(d - wd, d + wd, 2.2 + i * 3.7, H * 0.003, mel(stC, [30, 46, 60], 0.55), 0.75 * wRai * (1 - hz * 0.4));
+        nappeF(d - wd * 1.9, d - wd, 2.2 + i * 3.7, H * 0.003, mel(stC, [255, 255, 250], 0.40), 0.45 * wRai * (1 - hz * 0.7));
+      }
+    }
+
+    // ================= 9. grain, gravillons, cailloux =================
+    const nGr = Math.round(760 * (0.30 + gra));
+    for (let i = 0; i < nGr; i++){
+      const d = 1 + al(20000 + i * 3) * (DF - 1);
+      const q = 1 / d, yy = yOf(d), hz = hzOf(d);
+      const xx = pxOf((al(20001 + i * 3) - 0.5) * 2 * Xmx(q), q);
+      const rx = Math.max(0.35, H * 0.011 * q * 2.4 * (0.5 + al(20002 + i * 3)));
+      const up = al(20000 + i * 3) > 0.5;
+      posee(xx, yy, rx, 1);
+      c.fillStyle = K(loin(mel(bedC, up ? [246, 238, 218] : [16, 13, 10], 0.42), hz), (0.16 + 0.2 * gra) * (1 - hz * 0.55));
       c.fill();
-      const inten = 0.42 + 0.58 * N;
-      c.save();                                      // la flamme, seule chose qui vacille
-      c.globalCompositeOperation = "lighter";
-      const yf = yh - hw * 1.4;
-      const gf2 = c.createRadialGradient(x, yf, 0, x, yf, hw * 9 * flam);
-      gf2.addColorStop(0, "rgba(255,246,214," + (0.9 * inten) + ")");
-      gf2.addColorStop(0.3, "rgba(255,168,60," + (0.42 * inten) + ")");
-      gf2.addColorStop(1, "rgba(220,80,10,0)");
-      c.fillStyle = gf2;
-      c.beginPath(); c.arc(x, yf, hw * 9 * flam, 0, TAU); c.fill();
-      c.fillStyle = "rgba(255,214,120," + (0.92 * inten) + ")";
-      c.beginPath();
-      c.moveTo(x - hw * 1.1, yf + hw);
-      c.quadraticCurveTo(x - hw * 1.5, yf - hw * 2, x + hw * 0.2, yf - hw * 4.4 * flam);
-      c.quadraticCurveTo(x + hw * 1.4, yf - hw * 2, x + hw * 1.1, yf + hw);
-      c.closePath(); c.fill();
-      c.fillStyle = "rgba(255,252,226," + (0.85 * inten) + ")";
-      c.beginPath();
-      c.moveTo(x - hw * 0.5, yf + hw * 0.6);
-      c.quadraticCurveTo(x - hw * 0.6, yf - hw, x + hw * 0.1, yf - hw * 2.3 * flam);
-      c.quadraticCurveTo(x + hw * 0.7, yf - hw, x + hw * 0.5, yf + hw * 0.6);
-      c.closePath(); c.fill();
-      c.restore();
-      c.restore();
+    }
+    const nCa = Math.round(140 * cl(w6(0) + w6(2) * 0.8 + w6(1) * 0.2));
+    for (let i = 0; i < nCa; i++){
+      const d = 1 + al(21000 + i * 3) * (DF - 1);
+      const q = 1 / d, yy = yOf(d), hz = hzOf(d);
+      const xx = pxOf((al(21001 + i * 3) - 0.5) * 2 * Xmx(q), q);
+      const rx = H * 0.028 * q * 2.4 * (0.5 + al(21002 + i * 3));
+      const li = cl(1 - hz * 0.85);
+      posee(xx - rx * 0.30, yy + rx * FLAT * q * 0.30, rx * 1.05, 1);
+      c.fillStyle = K([16, 13, 10], 0.20 * li); c.fill();      // contact au sol
+      posee(xx, yy, rx, 1);
+      c.fillStyle = K(loin(mel(bedC, [130, 122, 106], 0.55), hz), 0.72); c.fill();
+      posee(xx + rx * 0.20, yy - rx * FLAT * q * 0.24, rx * 0.58, 1);
+      c.fillStyle = K(loin([238, 232, 210], hz), 0.42 * li); c.fill();
     }
 
-    // ---------- réverbère à gaz ----------
-    function gaz(x, a){
-      if (a < 0.02) return;
-      c.save(); c.globalAlpha = a;
-      const ht = PH * 3.2, hw = PH * 0.055, col = [46, 54, 48];
-      contact(x, ySit, hw * 6);
-      for (let i = 0; i < 3; i++){                   // socle mouluré
-        const hb = hw * (3.4 - i * 0.9), yb = ySit - hw * (i * 1.7);
-        cyl(x, yb - hw * 1.7, yb, hb, col);
-        c.fillStyle = om(206, 214, 206, 0.30);
-        c.fillRect(x - hb, yb - hw * 1.7, hb * 2, hair);
-      }
-      cyl(x, ySit - ht, ySit - hw * 5, hw, col);
-      c.strokeStyle = om(180, 190, 182, 0.22); c.lineWidth = hair;  // cannelures
-      c.beginPath();
-      for (let i = -1; i <= 1; i++){
-        c.moveTo(x + i * hw * 0.5, ySit - ht); c.lineTo(x + i * hw * 0.5, ySit - hw * 5);
-      }
-      c.stroke();
-      const yl = ySit - ht;
-      c.strokeStyle = om(col[0] * 1.4, col[1] * 1.4, col[2] * 1.4, 1);
-      c.lineWidth = hw * 0.6;
-      c.beginPath();                                 // potence d'allumeur
-      c.moveTo(x - hw * 3, yl + hw * 5); c.lineTo(x + hw * 3, yl + hw * 5);
-      c.stroke();
-      const lw = hw * 3.1, lh = hw * 5.2;            // lanterne
-      c.fillStyle = om(col[0] * 0.8, col[1] * 0.8, col[2] * 0.8, 1);
-      c.beginPath();
-      c.moveTo(x - lw, yl); c.lineTo(x + lw, yl);
-      c.lineTo(x + lw * 0.82, yl - lh); c.lineTo(x - lw * 0.82, yl - lh);
-      c.closePath(); c.fill();
-      const gv = c.createLinearGradient(x - lw, 0, x + lw, 0);
-      gv.addColorStop(0, om(112, 132, 128, 0.55));
-      gv.addColorStop(0.62, om(190, 208, 200, 0.5));
-      gv.addColorStop(1, om(120, 138, 134, 0.55));
-      c.fillStyle = gv;
-      c.beginPath();
-      c.moveTo(x - lw * 0.86, yl - lh * 0.06); c.lineTo(x + lw * 0.86, yl - lh * 0.06);
-      c.lineTo(x + lw * 0.74, yl - lh * 0.94); c.lineTo(x - lw * 0.74, yl - lh * 0.94);
-      c.closePath(); c.fill();
-      c.strokeStyle = om(col[0] * 1.2, col[1] * 1.2, col[2] * 1.2, 1);
-      c.lineWidth = hair * 1.6;
-      c.beginPath();
-      c.moveTo(x - lw * 0.86, yl); c.lineTo(x - lw * 0.74, yl - lh);
-      c.moveTo(x + lw * 0.86, yl); c.lineTo(x + lw * 0.74, yl - lh);
-      c.moveTo(x, yl); c.lineTo(x, yl - lh);
-      c.stroke();
-      c.fillStyle = om(col[0] * 1.1, col[1] * 1.1, col[2] * 1.1, 1);   // chapeau
-      c.beginPath();
-      c.moveTo(x - lw * 1.25, yl - lh); c.lineTo(x + lw * 1.25, yl - lh);
-      c.lineTo(x, yl - lh * 1.5); c.closePath(); c.fill();
-      c.fillStyle = om(228, 234, 226, 0.30);
-      c.beginPath();
-      c.moveTo(x, yl - lh * 1.5); c.lineTo(x + lw * 1.25, yl - lh);
-      c.lineTo(x + lw * 0.4, yl - lh); c.closePath(); c.fill();
-      c.fillStyle = om(col[0] * 1.3, col[1] * 1.3, col[2] * 1.3, 1);
-      c.fillRect(x - hair, yl - lh * 1.78, hair * 2, lh * 0.3);
-      if (N > 0.02){                                 // manchon incandescent
-        c.save();
-        c.globalCompositeOperation = "lighter";
-        const yg = yl - lh * 0.5;
-        const gg2 = c.createRadialGradient(x, yg, 0, x, yg, lw * 5);
-        gg2.addColorStop(0, "rgba(255,236,190," + (0.85 * N) + ")");
-        gg2.addColorStop(0.22, "rgba(255,206,128," + (0.34 * N) + ")");
-        gg2.addColorStop(1, "rgba(240,160,60,0)");
-        c.fillStyle = gg2;
-        c.beginPath(); c.arc(x, yg, lw * 5, 0, TAU); c.fill();
-        c.fillStyle = "rgba(255,246,222," + (0.9 * N) + ")";
-        c.beginPath(); c.ellipse(x, yg, lw * 0.32, lh * 0.22, 0, 0, TAU); c.fill();
-        c.restore();
-      }
-      c.restore();
-    }
-
-    // ---------- lampadaire électrique ----------
-    function elec(x, a){
-      if (a < 0.02) return;
-      c.save(); c.globalAlpha = a;
-      const ht = PH * 3.9, hw = PH * 0.048, col = [128, 132, 136];
-      contact(x, ySit, hw * 6);
-      cyl(x, ySit - hw * 2.2, ySit, hw * 2.1, [96, 98, 100]);
-      cyl(x, ySit - ht * 0.55, ySit - hw * 2.2, hw * 1.25, col);
-      cyl(x, ySit - ht, ySit - ht * 0.55, hw, col);
-      const yl = ySit - ht;
-      c.strokeStyle = om(col[0], col[1], col[2], 1);
-      c.lineWidth = hw * 1.5; c.lineCap = "round";
-      c.beginPath();                                 // crosse
-      c.moveTo(x, yl + hw * 2);
-      c.quadraticCurveTo(x + hw * 0.6, yl - hw * 2.2, x + hw * 5.2, yl - hw * 2.6);
-      c.stroke();
-      c.strokeStyle = om(232, 236, 240, 0.45); c.lineWidth = hw * 0.4;
-      c.beginPath();
-      c.moveTo(x + hw * 0.3, yl + hw * 2);
-      c.quadraticCurveTo(x + hw * 0.9, yl - hw * 1.9, x + hw * 5.2, yl - hw * 2.9);
-      c.stroke();
-      const hx = x + hw * 6.4, hy = yl - hw * 2.6;   // capot réflecteur
-      const gh2 = c.createLinearGradient(hx, hy - hw * 1.6, hx, hy + hw * 0.6);
-      gh2.addColorStop(0, om(206, 210, 214, 1));
-      gh2.addColorStop(1, om(112, 116, 120, 1));
-      c.fillStyle = gh2;
-      c.beginPath();
-      c.moveTo(hx - hw * 3.4, hy); c.lineTo(hx + hw * 3.4, hy);
-      c.lineTo(hx + hw * 2.2, hy - hw * 1.7); c.lineTo(hx - hw * 2.2, hy - hw * 1.7);
-      c.closePath(); c.fill();
-      c.fillStyle = om(238, 240, 236, 0.85);
-      c.beginPath(); c.ellipse(hx, hy, hw * 3.2, hw * 0.7, 0, 0, TAU); c.fill();
-      c.fillStyle = om(0, 0, 0, 0.35);
-      c.beginPath(); c.ellipse(hx, hy + hw * 0.2, hw * 3.2, hw * 0.5, 0, 0, Math.PI); c.fill();
-      if (N > 0.02){
-        c.save();
-        c.globalCompositeOperation = "lighter";
-        c.fillStyle = "rgba(250,252,246," + (0.95 * N) + ")";
-        c.beginPath(); c.ellipse(hx, hy, hw * 3.0, hw * 0.62, 0, 0, TAU); c.fill();
-        const gc2 = c.createLinearGradient(hx, hy, hx, ySit + H * 0.5);
-        gc2.addColorStop(0, "rgba(246,250,236," + (0.30 * N) + ")");
-        gc2.addColorStop(1, "rgba(246,250,236,0)");
-        c.fillStyle = gc2;
-        c.beginPath();                               // cône descendant
-        c.moveTo(hx - hw * 3, hy); c.lineTo(hx + hw * 3, hy);
-        c.lineTo(hx + hw * 15, ySit + H * 0.5); c.lineTo(hx - hw * 15, ySit + H * 0.5);
-        c.closePath(); c.fill();
-        c.restore();
-      }
-      c.restore();
-    }
-
-    // ---------- borne lumineuse ----------
-    function borneLum(x, a){
-      if (a < 0.02) return;
-      c.save(); c.globalAlpha = a;
-      const ht = PH * 1.45, hw = PH * 0.16;
-      contact(x, ySit, hw * 2.6);
-      cyl(x, ySit - ht, ySit, hw, [206, 214, 222]);
-      c.fillStyle = om(228, 236, 244, 1);            // dessus arrondi
-      c.beginPath(); c.ellipse(x, ySit - ht, hw, hw * 0.34, 0, 0, TAU); c.fill();
-      c.fillStyle = om(255, 255, 255, 0.4);
-      c.beginPath(); c.ellipse(x + hw * 0.25, ySit - ht - hw * 0.06, hw * 0.55, hw * 0.16, 0, 0, TAU); c.fill();
-      c.fillStyle = om(70, 92, 104, 0.9);            // fente de diffusion
-      c.fillRect(x - hw * 0.22, ySit - ht * 0.92, hw * 0.44, ht * 0.74);
-      const inten = 0.25 + 0.75 * N;
-      c.save();
-      c.globalCompositeOperation = "lighter";
-      const gs = c.createLinearGradient(x - hw * 2.4, 0, x + hw * 2.4, 0);
-      gs.addColorStop(0, "rgba(120,236,255,0)");
-      gs.addColorStop(0.5, "rgba(120,236,255," + (0.42 * inten) + ")");
-      gs.addColorStop(1, "rgba(120,236,255,0)");
-      c.fillStyle = gs;
-      c.fillRect(x - hw * 2.4, ySit - ht, hw * 4.8, ht);
-      c.fillStyle = "rgba(226,252,255," + (0.9 * inten) + ")";
-      c.fillRect(x - hw * 0.15, ySit - ht * 0.9, hw * 0.3, ht * 0.7);
-      c.restore();
-      c.restore();
-    }
-
-    torche(LAMPX, wTor); gaz(LAMPX, wGaz); elec(LAMPX, wEle); borneLum(LAMPX, wBor);
-
-    // ---------- la fontaine ----------
-    (function fontaine(){
-      const x = FONTX;
-      const col = mc([[142,128,104],[192,186,166],[136,128,110],[86,92,88],[168,170,168],[214,224,232]]);
-      const bw = PH * 1.15, bh = PH * 0.52, sh = PH * (1.0 + w6(1) * 0.5 + w6(5) * 0.3);
-      const yb = ySit;
-      contact(x, yb + bh * 0.1, bw * 1.25);
-      // stèle arrière et son bec
-      const sw = bw * (0.30 + w6(3) * 0.1 + w6(4) * 0.1);
-      cyl(x, yb - bh * 0.4 - sh, yb - bh * 0.3, sw, col);
-      if (w6(1) + w6(2) > 0.02){                     // fronton antique
-        c.save(); c.globalAlpha = Math.min(1, w6(1) + w6(2));
-        c.fillStyle = om(col[0] * 1.18, col[1] * 1.18, col[2] * 1.16, 1);
+    // touffes d'herbe du sentier : basses et etalees, jamais dressees
+    const wHer = cl(w6(0) + w6(2) * 0.35);
+    if (wHer > 0.01){
+      for (let i = 0; i < 34; i++){
+        const d = 1 + al(22000 + i * 4) * (DF - 1);
+        const q = 1 / d, yy = yOf(d), hz = hzOf(d);
+        const xx = pxOf((al(22001 + i * 4) - 0.5) * 2 * Xmx(q), q);
+        const rr = H * 0.05 * q * 2.4 * (0.6 + al(22002 + i * 4));
+        c.strokeStyle = K(loin([98, 112, 58], hz), 0.5 * wHer);
+        c.lineWidth = Math.max(hair * 0.8, rr * 0.09);
         c.beginPath();
-        c.moveTo(x - sw * 1.5, yb - bh * 0.4 - sh);
-        c.lineTo(x + sw * 1.5, yb - bh * 0.4 - sh);
-        c.lineTo(x, yb - bh * 0.4 - sh * 1.28);
-        c.closePath(); c.fill();
-        c.fillStyle = om(0, 0, 0, 0.28);
-        c.beginPath();
-        c.moveTo(x - sw * 1.5, yb - bh * 0.4 - sh);
-        c.lineTo(x, yb - bh * 0.4 - sh * 1.28);
-        c.lineTo(x - sw * 0.2, yb - bh * 0.4 - sh);
-        c.closePath(); c.fill();
-        c.restore();
-      }
-      const ybec = yb - bh * 0.4 - sh * 0.34;
-      c.fillStyle = om(col[0] * 0.6, col[1] * 0.62, col[2] * 0.6, 1);   // bec
-      c.fillRect(x - sw * 0.22, ybec, sw * 0.44, sh * 0.1);
-      c.fillStyle = om(col[0] * 0.42, col[1] * 0.44, col[2] * 0.44, 1);
-      c.beginPath(); c.ellipse(x, ybec + sh * 0.1, sw * 0.22, sh * 0.03, 0, 0, TAU); c.fill();
-      // vasque : rebord vu de dessus, panse en dessous
-      const gp = c.createLinearGradient(x - bw, 0, x + bw, 0);
-      gp.addColorStop(0, om(col[0] * 0.5, col[1] * 0.5, col[2] * 0.54, 1));
-      gp.addColorStop(0.68, om(col[0] * 1.10, col[1] * 1.10, col[2] * 1.08, 1));
-      gp.addColorStop(1, om(col[0] * 0.72, col[1] * 0.72, col[2] * 0.76, 1));
-      c.fillStyle = gp;
-      c.beginPath();
-      c.moveTo(x - bw, yb - bh * 0.3);
-      c.lineTo(x + bw, yb - bh * 0.3);
-      c.lineTo(x + bw * 0.82, yb + bh * 0.16);
-      c.quadraticCurveTo(x, yb + bh * 0.42, x - bw * 0.82, yb + bh * 0.16);
-      c.closePath(); c.fill();
-      c.fillStyle = om(col[0] * 1.22, col[1] * 1.20, col[2] * 1.16, 1);  // margelle
-      c.beginPath(); c.ellipse(x, yb - bh * 0.3, bw, bh * 0.30, 0, 0, TAU); c.fill();
-      const gw2 = c.createLinearGradient(0, yb - bh * 0.5, 0, yb - bh * 0.1);
-      gw2.addColorStop(0, om(126, 156, 172, 1));     // l'eau prend le ciel du fond
-      gw2.addColorStop(1, om(58, 82, 88, 1));
-      c.fillStyle = gw2;
-      c.beginPath(); c.ellipse(x, yb - bh * 0.28, bw * 0.80, bh * 0.22, 0, 0, TAU); c.fill();
-      c.strokeStyle = om(226, 240, 248, 0.55); c.lineWidth = hair;
-      for (let i = 0; i < 3; i++){                   // rides sous le jet
-        c.beginPath();
-        c.ellipse(x, yb - bh * 0.28, bw * (0.18 + i * 0.22), bh * (0.05 + i * 0.06), 0, 0, TAU);
+        for (let j = 0; j < 5; j++){
+          const a2 = (al(22003 + i * 4 + j * 7) - 0.5) * 2.2;
+          c.moveTo(xx, yy);
+          c.lineTo(xx + Math.sin(a2) * rr, yy - Math.abs(Math.cos(a2)) * rr * FLAT * q * 1.5);
+        }
         c.stroke();
       }
-      c.fillStyle = om(0, 0, 0, 0.30);
-      c.beginPath(); c.ellipse(x, yb - bh * 0.3, bw, bh * 0.30, 0, Math.PI * 1.05, Math.PI * 1.95); c.fill();
-      c.fillStyle = om(255, 250, 236, 0.35);         // liseré de margelle au haut-droite
-      c.beginPath(); c.ellipse(x, yb - bh * 0.33, bw * 0.99, bh * 0.29, 0, -1.9, 0.35); c.fill();
-      // le jet
-      c.save();
-      c.globalAlpha = 0.75;
-      c.strokeStyle = om(214, 234, 244, 0.8);
-      c.lineWidth = sw * 0.16; c.lineCap = "round";
-      c.beginPath();
-      c.moveTo(x, ybec + sh * 0.11);
-      c.quadraticCurveTo(x + sw * 0.05, yb - bh * 0.9, x, yb - bh * 0.32);
-      c.stroke();
-      c.strokeStyle = om(255, 255, 255, 0.55); c.lineWidth = sw * 0.05;
-      c.stroke();
-      c.restore();
-      if (w6(5) > 0.02){                             // anneau lumineux de la cité future
-        c.save();
-        c.globalCompositeOperation = "lighter";
-        c.globalAlpha = w6(5);
-        c.strokeStyle = "rgba(140,240,255," + (0.35 + 0.5 * N) + ")";
-        c.lineWidth = hair * 2.2;
-        c.beginPath(); c.ellipse(x, yb - bh * 0.3, bw * 0.9, bh * 0.27, 0, 0, TAU); c.stroke();
-        c.restore();
-      }
-    })();
+    }
 
-    // ---------- les bornes ----------
-    (function bornes(){
-      const bwF = mx([0.20, 0.17, 0.15, 0.13, 0.14, 0.12]);
-      const bhF = mx([0.60, 0.95, 0.55, 0.80, 0.72, 0.62]);
-      const dome = mx([0.55, 0.45, 0.30, 0.60, 0.18, 0.10]);
-      const col = mc([[150,132,102],[196,188,168],[128,114,92],[62,66,64],[228,226,220],[224,232,240]]);
-      const grav = mx([0.00, 0.90, 0.20, 0.35, 0.85, 0.55]);
-      const band = mx([0.00, 0.00, 0.00, 0.35, 0.90, 0.60]);
-      const xs = [0.055, 0.40, 0.885];
-      for (let i = 0; i < xs.length; i++){
-        const x = xs[i] * W;
-        const hw = PH * bwF * (1 + (R(16000 + i) - 0.5) * 0.12);
-        const ht = PH * bhF * (1 + (R(16100 + i) - 0.5) * 0.10);
-        contact(x, ySit, hw * 2.2);
-        cyl(x, ySit - ht, ySit, hw, col);
-        c.fillStyle = om(col[0] * 1.18, col[1] * 1.16, col[2] * 1.12, 1);
-        c.beginPath();                               // couronnement, du dôme au chanfrein
-        c.ellipse(x, ySit - ht, hw, hw * (0.22 + dome * 0.5), 0, Math.PI, TAU);
-        c.lineTo(x + hw, ySit - ht + hw * 0.1);
-        c.lineTo(x - hw, ySit - ht + hw * 0.1);
-        c.closePath(); c.fill();
-        c.fillStyle = om(255, 250, 232, 0.30);
-        c.beginPath();
-        c.ellipse(x + hw * 0.22, ySit - ht - hw * dome * 0.16, hw * 0.5, hw * (0.1 + dome * 0.2), 0, 0, TAU);
-        c.fill();
-        if (band > 0.02){                            // bande peinte
-          c.save(); c.globalAlpha = band;
-          c.fillStyle = om(196, 62, 48, 1);
-          c.fillRect(x - hw, ySit - ht + hw * 0.2, hw * 2, ht * 0.16);
-          c.fillStyle = om(0, 0, 0, 0.25);
-          c.fillRect(x - hw, ySit - ht + hw * 0.2 + ht * 0.13, hw * 2, ht * 0.04);
-          c.restore();
+    // ================= 10. voile atmospherique, un seul etalonnage =================
+    const gv = c.createLinearGradient(0, y0, 0, y1);
+    for (let i = 0; i <= 6; i++){
+      const s = i / 6, yy = y0 + H * s;
+      gv.addColorStop(s, K(hzC, hzOf(1 / qOf(yy)) * 0.56));
+    }
+    c.fillStyle = gv; c.fillRect(0, y0, W, H);
+
+    // ================= 11. lumieres =================
+    if (N > 0.02 || wRai > 0.004){
+      c.save();
+      c.globalCompositeOperation = "lighter";
+      if (wRai > 0.004){
+        for (let i = 0; i < RAIN.length; i++){
+          const d = RAIN[i], q = 1 / d, yy = yOf(d);
+          const th = Math.max(hair, 0.045 * CD * q * q);
+          const halo = th * 9;
+          const gg = c.createLinearGradient(0, yy - halo, 0, yy + halo);
+          const a = (0.16 + 0.5 * N) * wRai;
+          gg.addColorStop(0, "rgba(90,190,235,0)");
+          gg.addColorStop(0.5, "rgba(150,225,255," + (a * 0.85).toFixed(3) + ")");
+          gg.addColorStop(1, "rgba(90,190,235,0)");
+          c.fillStyle = gg; c.fillRect(0, yy - halo, W, halo * 2);
+          c.fillStyle = "rgba(226,250,255," + ((0.30 + 0.6 * N) * wRai).toFixed(3) + ")";
+          c.fillRect(0, yy - th * 0.5, W, th);
         }
-        if (grav > 0.02){                            // inscription creusée
-          c.save(); c.globalAlpha = grav;
-          for (let k = 0; k < 3; k++){
-            const yg = ySit - ht * (0.55 - k * 0.16);
-            const lw2 = hw * RR(16200 + i * 7 + k, 0.7, 1.35);
-            c.fillStyle = om(0, 0, 0, 0.5);
-            c.fillRect(x - lw2 * 0.5, yg, lw2, Math.max(hair, ht * 0.035));
-            c.fillStyle = om(255, 248, 228, 0.32);
-            c.fillRect(x - lw2 * 0.5, yg + Math.max(hair, ht * 0.035), lw2, hair * 0.8);
-          }
+      }
+      // flaques de lumiere : des ellipses tres couchees, jamais des cones
+      const wLum = cl(w6(3) * 0.7 + w6(4) + w6(5) * 0.8);
+      if (N > 0.02 && wLum > 0.01){
+        const teinte = w6(4) + w6(5) > 0.5 ? [214, 232, 255] : [255, 206, 132];
+        for (let i = 0; i < 4; i++){
+          const d = 1.12 + al(24000 + i * 2) * (DF - 1.3);
+          const q = 1 / d, yy = yOf(d);
+          const xx = pxOf((al(24001 + i * 2) - 0.5) * 1.9 * Xmx(q), q);
+          const rx = H * 0.75 * q * 2.2;
+          c.save();
+          c.translate(xx, yy); c.scale(1, FLAT * q);
+          const gp = c.createRadialGradient(0, 0, 0, 0, 0, Math.max(1, rx));
+          const a = 0.30 * N * wLum;
+          gp.addColorStop(0, "rgba(" + teinte[0] + "," + teinte[1] + "," + teinte[2] + "," + a.toFixed(3) + ")");
+          gp.addColorStop(0.55, "rgba(" + teinte[0] + "," + teinte[1] + "," + teinte[2] + "," + (a * 0.32).toFixed(3) + ")");
+          gp.addColorStop(1, "rgba(" + teinte[0] + "," + teinte[1] + "," + teinte[2] + ",0)");
+          c.fillStyle = gp;
+          c.beginPath(); c.arc(0, 0, Math.max(1, rx), 0, TAU); c.fill();
           c.restore();
         }
       }
-    })();
+      c.restore();
+    }
+
+    // ================= 12. mobilier plante sur le bord proche =================
+    /* Seuls objets verticaux tolerés, et courts : a cette echelle la voie n'a de
+       place que pour leur pied. */
+    const MOB = [
+      [[0.115, 0.62, 0], [0.355, 0.42, 1], [0.845, 0.55, 0]],
+      [[0.140, 0.92, 2], [0.870, 0.70, 3]],
+      [[0.105, 0.78, 0], [0.400, 0.44, 1], [0.865, 0.86, 4]],
+      [[0.095, 0.72, 5], [0.885, 1.00, 4]],
+      [[0.110, 0.62, 6], [0.890, 0.94, 7]],
+      [[0.120, 1.00, 8], [0.885, 0.88, 8]]
+    ];
+    const CORPS = [[122, 96, 62], [138, 128, 106], [206, 198, 172], [190, 182, 156],
+                   [76, 66, 54], [58, 58, 62], [180, 182, 186], [126, 130, 136], [176, 196, 214]];
+    const yMob = y1 - H * 0.035, qMob = qOf(yMob);
+    const HMOB = H * 0.19;
+    const flam = 0.86 + 0.14 * Math.sin(t * 8.3) + 0.06 * Math.sin(t * 19.7);
+    for (let s = 0; s < 6; s++){
+      const wS = w6(s);
+      if (wS < 0.004) continue;
+      for (let i = 0; i < MOB[s].length; i++){
+        const m = MOB[s][i], xx = W * m[0], hg = HMOB * m[1], ty = m[2];
+        const wd = hg * (ty === 1 ? 0.62 : ty === 3 ? 0.40 : 0.26);
+        const col = CORPS[ty];
+        // l'ombre file vers le bas-gauche et reste couchee sur le sol
+        posee(xx - hg * 0.52, yMob + hg * 0.05, hg * 0.95, 1);
+        c.fillStyle = K([14, 12, 10], 0.30 * wS); c.fill();
+        posee(xx, yMob, wd * 0.62, 1);
+        c.fillStyle = K([16, 14, 12], 0.34 * wS); c.fill();
+
+        if (ty === 1){                                  // cairn : un tas, pas un mat
+          for (let j = 0; j < 4; j++){
+            const rr = wd * (0.50 - j * 0.09);
+            posee(xx + (al(26000 + i * 5 + j) - 0.5) * wd * 0.22, yMob - hg * (0.10 + j * 0.20), rr, 1.6);
+            c.fillStyle = K(mel(col, [255, 244, 220], 0.10 + j * 0.10), wS); c.fill();
+          }
+          continue;
+        }
+        const tp = ty === 5 || ty === 6 ? 0.72 : 0.86;
+        c.beginPath();
+        c.moveTo(xx - wd * 0.5, yMob);
+        c.lineTo(xx - wd * 0.5 * tp, yMob - hg);
+        c.lineTo(xx + wd * 0.5 * tp, yMob - hg);
+        c.lineTo(xx + wd * 0.5, yMob);
+        c.closePath();
+        c.fillStyle = K(mel(col, [12, 10, 8], 0.30), wS); c.fill();
+        c.beginPath();                                   // face droite eclairee
+        c.moveTo(xx + wd * 0.06, yMob);
+        c.lineTo(xx + wd * 0.06 * tp, yMob - hg);
+        c.lineTo(xx + wd * 0.5 * tp, yMob - hg);
+        c.lineTo(xx + wd * 0.5, yMob);
+        c.closePath();
+        c.fillStyle = K(mel(col, [255, 248, 228], 0.26), wS); c.fill();
+        posee(xx, yMob - hg, wd * 0.5 * tp, 2.2);        // couronnement
+        c.fillStyle = K(mel(col, [255, 250, 232], 0.42), wS); c.fill();
+
+        if (ty === 4 || ty === 7 || ty === 8){           // les porteurs de lumiere
+          const yl = yMob - hg * 1.02;
+          const chaud = ty === 4;
+          const a = (chaud ? flam : 1) * (0.25 + 0.72 * N) * wS;
+          c.save();
+          c.globalCompositeOperation = "lighter";
+          const rr = wd * (chaud ? 2.6 : 3.4);
+          const gg = c.createRadialGradient(xx, yl, 0, xx, yl, Math.max(1, rr));
+          const tc = chaud ? "255,182,86" : ty === 7 ? "222,238,255" : "150,222,255";
+          gg.addColorStop(0, "rgba(" + tc + "," + a.toFixed(3) + ")");
+          gg.addColorStop(1, "rgba(" + tc + ",0)");
+          c.fillStyle = gg;
+          c.beginPath(); c.arc(xx, yl, Math.max(1, rr), 0, TAU); c.fill();
+          c.fillStyle = "rgba(255,246,224," + (a * 0.9).toFixed(3) + ")";
+          c.beginPath(); c.ellipse(xx, yl, wd * 0.32, wd * 0.32 * (chaud ? 1.5 : 1.0), 0, 0, TAU); c.fill();
+          c.restore();
+          // la lueur retombe sur la voie en flaque couchee
+          c.save();
+          c.globalCompositeOperation = "lighter";
+          c.translate(xx, yMob); c.scale(1, FLAT * qMob);
+          const gp = c.createRadialGradient(0, 0, 0, 0, 0, Math.max(1, hg * 2.2));
+          gp.addColorStop(0, "rgba(" + tc + "," + (a * 0.42).toFixed(3) + ")");
+          gp.addColorStop(1, "rgba(" + tc + ",0)");
+          c.fillStyle = gp;
+          c.beginPath(); c.arc(0, 0, Math.max(1, hg * 2.2), 0, TAU); c.fill();
+          c.restore();
+        }
+      }
+    }
 
     c.restore();
   }
