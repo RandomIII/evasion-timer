@@ -42,7 +42,22 @@ Ne pas attendre qu'on demande une deuxième puis une troisième passe.
 **Trancher soi-même sur le design.** « Détermine toi un peu plus » est un retour
 qui a déjà été donné : proposer un parti pris net vaut mieux qu'un compromis mou.
 
-## 3. Chaque monde reste étanche
+## 3. Toujours plusieurs agents pour les assets
+
+Un asset visuel se confie à un **agent dédié**, et on les lance **tous en
+parallèle**. C'est plus rapide, et chaque agent creuse son sujet au lieu de
+survoler dix objets à la suite.
+
+Le contrat donné à l'agent doit être complet, sinon les pièces ne se recollent
+pas : signature exacte, repère local (origine, sens des y, bornes), helpers
+fournis en paramètre plutôt que réimplémentés, direction de la lumière,
+interdiction de `Math.random()`, équilibre `save`/`restore`, et `node --check`
+avant de rendre.
+
+Grouper par **famille cohérente** quand deux objets partagent matériaux et
+lumière (une maison et son monument de la même époque), sinon ils divergent.
+
+## 4. Chaque monde reste étanche
 
 Chaque monde a ses mécaniques : le manomètre appartient à l'eau, les
 millisecondes au néon, les saisons à l'arbre.
@@ -53,13 +68,13 @@ millisecondes au néon, les saisons à l'arbre.
   absente : parcourir l'union de tous les identifiants, sinon un id inconnu
   n'est jamais masqué.
 
-## 4. Viser haut en densité et en intensité
+## 5. Viser haut en densité et en intensité
 
 Le projet est volontairement overkill. En cas de doute sur une quantité,
 doubler. La sobriété n'est pas une qualité ici, et le retour reçu est
 systématiquement « plus », jamais « moins ».
 
-## 5. Tester l'espace des réglages, pas le chemin nominal
+## 6. Tester l'espace des réglages, pas le chemin nominal
 
 Les bugs trouvés en usage réel venaient tous d'une configuration jamais testée :
 une heure de départ placée avant le déjeuner, 30 minutes restantes avec
@@ -71,7 +86,7 @@ la pause, pause désactivée, aucune compétence achetée, et l'après-départ.
 **Reproduire le bug avant de le corriger**, et vérifier que le contrôle échoue
 bien sur le code d'avant. Sinon il ne prouve rien.
 
-## 6. Stabilité d'une frame à l'autre
+## 7. Stabilité d'une frame à l'autre
 
 La graine d'une entité vient de son **identité** (indice de récursion, index dans
 un tableau), jamais de sa position ni de l'horloge : une position dérive avec le
@@ -81,7 +96,7 @@ Quand une vitesse d'animation varie, **intégrer le temps** (`phase += dt * k`)
 plutôt que multiplier l'horloge (`t * k`), sinon le moindre changement de facteur
 fait sauter l'animation d'un bout à l'autre de son cycle.
 
-## 7. Une mesure se prouve avant d'être citée
+## 8. Une mesure se prouve avant d'être citée
 
 Ne jamais annoncer un chiffre de performance sans avoir vérifié que l'instrument
 a mesuré quelque chose. Un chiffre inventé de bonne foi est pire qu'aucun
@@ -96,7 +111,7 @@ Pièges connus du navigateur sans interface :
   artefact, pas un bug.
 - Pour truquer l'heure, remplacer `window.Date` avant le script de l'appli.
 
-## 8. Style et git
+## 9. Style et git
 
 - Commentaires en français, identifiants en anglais, trois lignes maximum, et
   seulement pour expliquer le **pourquoi** quand il n'est pas évident.
@@ -105,7 +120,7 @@ Pièges connus du navigateur sans interface :
   pas de corps. Il dit ce que ça change, pas la mécanique employée.
 - Jamais de mention d'IA dans le code ou les commits.
 
-## 9. Fin de tour
+## 10. Fin de tour
 
 - Ne pas laisser l'appli tourner dans le volet navigateur : le canvas anime en
   continu pour rien. Fermer l'onglet avant de rendre la main.

@@ -58,7 +58,12 @@ Notes de conception d'origine :
   s'éclaircit (noir abyssal → bleu profond → turquoise → surface scintillante).
 - Pause midi : le plongeur fait un **palier de décompression**.
 
-### 🌱 L'Arbre — de la graine à l'espace
+### 🌱 L'Arbre — **✅ CONSTRUIT (Monde 3)**
+Réalisé : pousse le matin, ciel, nuages, espace, survol de la Lune, trou noir
+à la fin. Feuillage saisonnier sur la vraie date. En LIBRE, l'arbre devient un
+astre et le système solaire lui tourne autour.
+
+Notes de conception d'origine :
 - La **croissance verticale est la barre de progression** : la caméra suit la
   cime, on monte avec l'arbre toute la journée.
 - Étapes : graine dans la terre (08:30) → germination → tige et feuilles →
@@ -87,7 +92,12 @@ Notes de conception d'origine :
   hiver), le décor évolue au fil de la journée.
 - Climax : à confirmer (transition de saison finale ? tempête de neige ?).
 
-### 🏘️ Village évolutif
+### 🏘️ Village évolutif — **✅ CONSTRUIT (Monde 4)**
+Réalisé : caméra fixe, six époques par tranches de 20 % de la journée, chaque
+parcelle bascule à son propre seuil. Instrument propre : la chronique (année,
+époque, population). Climax : le décollage de la cité.
+
+Notes de conception d'origine :
 - Le temps qui passe dans un village : **de la tribu préhistorique à la
   civilisation futuriste**. Plus la journée avance, plus le village évolue
   (huttes → maisons → gratte-ciels → cité futuriste).
@@ -118,8 +128,9 @@ nouveau module.
 1. **🌊 Abysses** — choisi comme Monde 2, premier à construire. Sert aussi de
    test pour l'architecture modulaire (caméra verticale, monnaie locale, arbre
    propre, climax).
-2. Ensuite, au choix : 🌱 l'Arbre, 🌋 le Volcan, 🌸 le Japon, 🍂 les Saisons,
-   🏘️ le Village.
+2. 🌱 l'Arbre (Monde 3), puis 🏘️ le Village (Monde 4).
+3. Restent : 🌋 le Volcan et 🌸 le Japon. Les 🍂 Saisons sont absorbées par
+   l'Arbre, qui change déjà de feuillage selon la vraie date.
 
 ## Questions encore ouvertes
 
