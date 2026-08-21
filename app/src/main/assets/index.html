@@ -11921,9 +11921,23 @@ function dessineNid(c, E, x, y, t, nuit) {
     const s = Math.sin((i + gr * 53.1) * 12.9898 + 78.233) * 43758.5453;
     return s - Math.floor(s);
   };
-  function batiment(c, ep, L, H, gr, nuit, t){
+  /* Perspective atmosphérique : plus un objet est loin, plus sa matière tire
+     vers la couleur de l'horizon. C'est ce qui recolle des assets dessinés
+     séparément ; sans ça le fond n'est qu'une version rapetissée du premier plan. */
+  function teinteScene(nuit, brume, ciel){
+    const k = Math.max(0, Math.min(1, nuit)) * .62;
+    const b = Math.max(0, Math.min(1, brume));
+    return (r, g, bb, a) => {
+      const R = (r * (1 - k) + 16 * k) * (1 - b) + ciel[0] * b;
+      const G = (g * (1 - k) + 22 * k) * (1 - b) + ciel[1] * b;
+      const B = (bb * (1 - k) + 46 * k) * (1 - b) + ciel[2] * b;
+      return "rgba(" + Math.round(R) + "," + Math.round(G) + "," + Math.round(B)
+           + "," + (a === undefined ? 1 : a) + ")";
+    };
+  }
+  function batiment(c, ep, L, H, gr, nuit, t, om){
     const f = [bat0, bat1, bat2, bat3, bat4, bat5][Math.max(0, Math.min(5, ep))];
-    f(c, L, H, teinteNuit(nuit), aleaDe(gr), Math.max(0, Math.min(1, nuit)), t);
+    f(c, L, H, om || teinteNuit(nuit), aleaDe(gr), Math.max(0, Math.min(1, nuit)), t);
   }
   function monument(c, ep, L, H, t, nuit){
     const f = [mon0, mon1, mon2, mon3, mon4, mon5][Math.max(0, Math.min(5, ep))];
@@ -11938,8 +11952,11 @@ function dessineNid(c, E, x, y, t, nuit) {
      ça dépend de l'heure, pas de la frame. Le monument, lui, reste vivant :
      c'est là que sont la flamme, la bannière et les anneaux. */
   const BATIS = new Map();
-  function spriteBati(ep, k, L, H, gr, nuit){
-    const cle = ep + "|" + k + "|" + Math.round(nuit * 8)
+  function spriteBati(ep, k, L, H, gr, nuit, brume, ciel){
+    /* La couleur d'horizon dérive en continu : brute dans la clef, elle faisait
+       recuire tous les sprites à chaque frame. On la quantifie par paliers de 16. */
+    const cle = ep + "|" + k + "|" + Math.round(nuit * 8) + "|" + Math.round(brume * 20)
+              + "|" + (ciel[0] >> 4) + "," + (ciel[1] >> 4) + "," + (ciel[2] >> 4)
               + "|" + Math.round(L) + "x" + Math.round(H);
     const vu = BATIS.get(cle);
     if (vu) return vu;
@@ -11948,7 +11965,7 @@ function dessineNid(c, E, x, y, t, nuit) {
     cv.height = Math.max(2, Math.ceil(H * 1.35 + 8));
     const g = cv.getContext("2d");
     g.translate(cv.width / 2, cv.height - 6);
-    batiment(g, ep, L, H, gr, nuit, 0);
+    batiment(g, ep, L, H, gr, nuit, 0, teinteScene(nuit, brume, ciel));
     if (BATIS.size > 80) BATIS.clear();          // borne mémoire au changement de taille
     BATIS.set(cle, cv);
     return cv;
@@ -11964,7 +11981,18 @@ function dessineNid(c, E, x, y, t, nuit) {
     const g = cv.getContext("2d");
     g.clearRect(0, 0, W, Hh);
     const om = teinteNuit(nuit), al = aleaDe(.271);
-    if (aDebloque("bg")) paysageFond(g, W, Hh, solY, ee, nuit, 0, E, om, al);
+    if (aDebloque("bg")){
+      paysageFond(g, W, Hh, solY, ee, nuit, 0, E, om, al);
+      /* Les reliefs ressortaient plus clairs que le ciel, ce qui aplatit tout :
+         on les ramène sous lui. `source-atop` ne touche que ce qui est déjà là. */
+      const cb = couleurVil(ee, "b");
+      g.save();
+      g.globalCompositeOperation = "source-atop";
+      g.fillStyle = "rgba(" + Math.round(cb[0] * .52) + "," + Math.round(cb[1] * .58)
+                  + "," + Math.round(cb[2] * .66) + ",.34)";
+      g.fillRect(0, 0, W, Hh);
+      g.restore();
+    }
     paysageSol(g, W, Hh, solY, ee, nuit, 0, E, om, al);
     paysageRoute(g, W, Hh, solY, ee, nuit, 0, E, om, al);
     DECOR.cle = cle; DECOR.cv = cv;
@@ -11987,6 +12015,7 @@ function dessineNid(c, E, x, y, t, nuit) {
 
     const solY = Hh * .76;
     const om = teinteNuit(nuit), al = aleaDe(.271);
+    const cielBas = couleurVil(ee, "b");           // cible du fondu atmosphérique
 
     // ---- le ciel ----
     const g = ctx.createLinearGradient(0, 0, 0, solY);
@@ -12026,7 +12055,17 @@ function dessineNid(c, E, x, y, t, nuit) {
 
     paysageNuages(ctx, W, Hh, solY, ee, nuit, t0, E, om, al);
     ctx.drawImage(decorVillage(ee, nuit, solY, E), 0, 0);
-    if (aDebloque("bg")) paysageArbres(ctx, W, Hh, solY, ee, nuit, t0, E, om, al);
+    /* Voile d'horizon : la ligne de sol séparait le cadre en deux images sans
+       transition, un lointain pâle posé sur un premier plan sombre. */
+    const hz = ctx.createLinearGradient(0, solY - Hh * .09, 0, solY + (Hh - solY) * .20);
+    hz.addColorStop(0,   "rgba(" + cielBas + ",0)");
+    hz.addColorStop(.52, "rgba(" + cielBas + "," + (.17 * jour + .06) + ")");
+    hz.addColorStop(1,   "rgba(" + cielBas + ",0)");
+    ctx.fillStyle = hz;
+    ctx.fillRect(0, solY - Hh * .09, W, (Hh - solY) * .20 + Hh * .09);
+    if (aDebloque("bg"))
+      paysageArbres(ctx, W, Hh, solY, ee, nuit, t0, E,
+                    teinteScene(nuit, .17, cielBas), al);
     // la voie garde ses bornes : habitants et convoi s'y placent
     const rY = solY + (Hh - solY) * .42, rH = (Hh - solY) * .32;
 
@@ -12041,7 +12080,7 @@ function dessineNid(c, E, x, y, t, nuit) {
       rendu.push({ q: q, e: e, g: pousse });
     }
     if (aDebloque("algues")) for (const r of rendu){
-      if (r.q.fond) dessineParcelle(r, solY, ee, nuit, t0, E);
+      if (r.q.fond) dessineParcelle(r, solY, ee, nuit, t0, E, cielBas);
     }
     // le monument, entre les deux rangées
     if (aDebloque("tresor")){
@@ -12055,7 +12094,7 @@ function dessineNid(c, E, x, y, t, nuit) {
       ctx.restore();
     }
     if (aDebloque("algues")) for (const r of rendu){
-      if (!r.q.fond) dessineParcelle(r, solY, ee, nuit, t0, E);
+      if (!r.q.fond) dessineParcelle(r, solY, ee, nuit, t0, E, cielBas);
     }
     /* Le grand foyer : une flaque de lumière chaude au cœur du village. C'est
        lui qui rend la nuit habitée plutôt que simplement sombre. */
@@ -12194,6 +12233,18 @@ function dessineNid(c, E, x, y, t, nuit) {
       ctx.beginPath(); ctx.arc(x, y - 20 * E, 5 * E, 0, 6.283); ctx.fill();
     }
 
+    /* Étalonnage : bascule froide en haut, chaude en bas, sur tout le cadre.
+       C'est la dernière chose qui donne à onze assets séparés l'air d'avoir été
+       peints le même jour. */
+    ctx.save();
+    ctx.globalCompositeOperation = "multiply";
+    const et = ctx.createLinearGradient(0, 0, 0, Hh);
+    et.addColorStop(0,   "rgb(234,237,251)");
+    et.addColorStop(.52, "rgb(255,251,243)");
+    et.addColorStop(1,   "rgb(253,237,220)");
+    ctx.fillStyle = et; ctx.fillRect(0, 0, W, Hh);
+    ctx.restore();
+
     // voile central, pour que le compteur reste lisible sur un ciel clair
     const vg = ctx.createRadialGradient(W * .5, Hh * .42, 0, W * .5, Hh * .42,
                                         Math.max(W, Hh) * .55);
@@ -12208,15 +12259,20 @@ function dessineNid(c, E, x, y, t, nuit) {
   }
 
   // pose d'une parcelle : place, met à l'échelle, applique la pousse du chantier
-  function dessineParcelle(r, solY, ee, nuit, t0, E){
+  function dessineParcelle(r, solY, ee, nuit, t0, E, cielBas){
     const q = r.q;
     const base = solY + (Hh - solY) * q.dy;
     const L = (78 + q.gr * 30) * E * q.ech;
     const H = (58 + q.gr * 26 + r.e * 26) * E * q.ech;
-    const sp = spriteBati(r.e, q.dec, L, H, q.gr, nuit + (q.fond ? .18 : 0));
+    const sp = spriteBati(r.e, q.dec, L, H, q.gr, nuit + (q.fond ? .18 : 0),
+                          q.fond ? .40 : .11, cielBas);
     const g2 = Math.max(.04, r.g);
     ctx.save();
-    if (q.fond){ ctx.globalAlpha = .82; }
+    ctx.fillStyle = "rgba(14,11,8," + ((q.fond ? .15 : .30) * (1 - nuit * .5)) + ")";
+    ctx.beginPath();
+    ctx.ellipse(q.u * W, base, L * .56, Math.max(2, L * .075), 0, 0, 6.283);
+    ctx.fill();
+    if (q.fond){ ctx.globalAlpha = .92; }
     ctx.drawImage(sp, q.u * W - sp.width / 2, base - (sp.height - 6) * g2 - 6 * g2,
                   sp.width, sp.height * g2);
     ctx.restore();

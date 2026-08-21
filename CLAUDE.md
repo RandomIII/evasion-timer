@@ -57,6 +57,15 @@ avant de rendre.
 Grouper par **famille cohérente** quand deux objets partagent matériaux et
 lumière (une maison et son monument de la même époque), sinon ils divergent.
 
+**Prévoir une passe de direction artistique après coup.** Des agents qui
+travaillent en parallèle produisent chacun un bon asset et, ensemble, une bouillie :
+densités de détail et plages de valeurs incompatibles, aucun objet posé dans le
+décor. Ce qui recolle, dans l'ordre d'efficacité : fondu atmosphérique vers la
+couleur de l'horizon selon la distance, ombre de contact sous chaque objet,
+correction des valeurs (un lointain ne doit jamais ressortir plus clair que le
+ciel), voile à la ligne d'horizon, et un étalonnage unique sur tout le cadre.
+Ces réglages appartiennent à la couche de composition, pas aux assets.
+
 ## 4. Chaque monde reste étanche
 
 Chaque monde a ses mécaniques : le manomètre appartient à l'eau, les
