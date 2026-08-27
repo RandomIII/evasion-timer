@@ -119,6 +119,12 @@ Pièges connus du navigateur sans interface :
   `--virtual-time-budget` : une lettre à demi tombée sur une capture est un
   artefact, pas un bug.
 - Pour truquer l'heure, remplacer `window.Date` avant le script de l'appli.
+- **Une capture sur trois environ sort entièrement noire.** Filtrer avec un
+  contrôle de luminance et recommencer, sinon on part chasser un bug qui
+  n'existe pas. C'est arrivé trois fois.
+- Un gel au premier rendu vient de la **compilation à froid** des modules, pas
+  du nombre de pixels. Mesurer avant de sacrifier la résolution : je l'ai fait
+  et j'ai flouté tout le décor pour rien.
 
 ## 9. Style et git
 

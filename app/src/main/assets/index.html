@@ -15088,9 +15088,39 @@ function dessineNid(c, E, x, y, t, nuit) {
      donc **une étape par frame**, sur un calque de réserve, en continuant
      d'afficher le décor précédent ; la bascule n'a lieu qu'une fois tout prêt.
      Comme une époque dure des minutes, la préparation passe inaperçue. */
-  const RD = 2;                          // demi-résolution : le fond est derrière le village
+  /* Pleine résolution. La demi-résolution avait été prise pour tuer un gel de
+     237 ms ; mesure refaite, ce gel venait de la compilation à froid des modules,
+     pas du nombre de pixels. En pleine résolution les étapes coûtent 26 et 30 ms,
+     et les arbres cessent d'être flous. */
+  const RD = 1;
   const N_PAS = 5;
   const PREP = { cle: "", cv: null, pas: 0 };
+  /* Le premier plan : les mêmes arbres, plantés plus bas et bien plus gros, posés
+     APRÈS les bâtiments. C'est lui qui donne la profondeur — sans rien devant, la
+     bande d'herbe restait vide et la scène s'aplatissait. */
+  const PREM = { cle: "", cv: null };
+  function premierPlan(eBrut, nuit, solY, E){
+    const ee = interpV(PAY_MAP, eBrut);
+    const cle = W + "x" + Hh + "|" + Math.round(ee * 40) + "|" + Math.round(nuit * 10);
+    if (PREM.cle === cle) return PREM.cv;
+    // une seule grosse cuisson par frame : on cède le tour au décor
+    if (PREP.pas > 0 && PREP.pas < N_PAS) return PREM.cv;
+    if (!aDebloque("bg")){ PREM.cle = cle; PREM.cv = null; return null; }
+    let cv = PREM.cv;
+    if (!cv || cv.width !== W || cv.height !== Hh){
+      cv = document.createElement("canvas"); cv.width = W; cv.height = Hh;
+    }
+    const g = cv.getContext("2d");
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    g.clearRect(0, 0, W, Hh);
+    // ligne de plantation abaissée et échelle doublée : ce sont les mêmes arbres,
+    // mais vus de beaucoup plus près
+    const sy = solY + (Hh - solY) * .72;
+    paysageArbres(g, W, Hh, sy, ee, nuit, 0, E * 2.1,
+                  teinteScene(nuit, .02, couleurVil(ee, "b")), aleaDe(.83));
+    PREM.cle = cle; PREM.cv = cv;
+    return cv;
+  }
 
   function calqueDecor(){
     const cw = Math.max(2, Math.ceil(W / RD)), ch = Math.max(2, Math.ceil(Hh / RD));
@@ -15165,7 +15195,7 @@ function dessineNid(c, E, x, y, t, nuit) {
     // rien à montrer encore : on cuit tout d'un coup, une seule fois par session
     // à l'entrée, on force juste de quoi avoir un sol ; la voie et les arbres suivent
     const presse = !DECOR.cv || DECOR.cv.width !== PREP.cv.width;
-    const budget = presse ? 2 : 1;
+    const budget = presse ? 1 : 1;
     for (let i = 0; i < budget && PREP.pas < N_PAS; i++)
       etapeDecor(PREP.cv, ee, nuit, solY, E, PREP.pas++);
     if (PREP.pas >= N_PAS){
@@ -15295,6 +15325,7 @@ function dessineNid(c, E, x, y, t, nuit) {
     /* L'herbe du premier plan est redessinée par-dessus les pieds des bâtiments.
        C'est ce recouvrement qui les inscrit dans le sol au lieu de les poser
        dessus, et c'est gratuit : le décor est déjà cuit. */
+    const pcv = premierPlan(iEre, nuit, solY, E);
     if (dcv){
       const yb = solY + (Hh - solY) * .062, fe = (Hh - solY) * .05;
       /* Le haut de la bande est monté en six tranches d'opacité croissante :
@@ -15307,6 +15338,7 @@ function dessineNid(c, E, x, y, t, nuit) {
       ctx.globalAlpha = 1;
       ctx.drawImage(dcv, 0, yb / RD, dcv.width, (Hh - yb) / RD, 0, yb, W, Hh - yb);
     }
+    if (pcv) ctx.drawImage(pcv, 0, 0);
     if (chantier) dessineOuvrier(rendu, u, iEre, solY, nuit, t0, E);
 
     /* Le grand foyer : une flaque de lumière chaude au cœur du village. C'est
@@ -15346,14 +15378,17 @@ function dessineNid(c, E, x, y, t, nuit) {
               Math.min(1, 2.4 - eeVis), nuit, t0, om, al, 11);
     }
 
-    // ---- les habitants ----
+    /* ---- les habitants ----
+       Leur taille suit leur position au sol : plus bas dans le cadre veut dire
+       plus près, donc plus grand. Tous de la même taille, ils écrasaient le plan. */
     if (aDebloque("diver")){
-      const n = 7;
+      const n = 9;
       for (let i = 0; i < n; i++){
         const ph = i * 2.4 + 1;
         const x = ((i / n + t0 * .012 * (i % 2 ? 1 : -1) + 1) % 1) * W;
-        const y = rY + rH * (.3 + .5 * ((i * .37) % 1));
-        const h = (13 + (i % 3) * 3) * E * (1 + (y - rY) / rH * .2);
+        const y = solY + (Hh - solY) * (.30 + .62 * ((i * .37) % 1));
+        const ech = .5 + 1.5 * ((y - solY) / Math.max(1, Hh - solY));
+        const h = (15 + (i % 3) * 3) * E * ech;
         const bal = Math.sin(t0 * 3.4 + ph) * .5;
         ctx.save(); ctx.translate(x, y);
         ctx.fillStyle = nuit > .4 ? "rgba(18,20,34,.9)" : "rgba(38,34,40,.82)";
@@ -15371,8 +15406,8 @@ function dessineNid(c, E, x, y, t, nuit) {
     // ---- le convoi : il change de moyen avec l'époque ----
     if (aDebloque("boat")){
       const vx = ((t0 * .055) % 1.25 - .125) * W;
-      const vy = rY + rH * .70;
-      const L = 46 * E * (1 + Math.min(ee, 5) * .1);
+      const vy = solY + (Hh - solY) * .80;          // il roule au premier plan
+      const L = 64 * E * (1 + Math.min(ee, 5) * .1);
       const eq = Math.round(ee);
       ctx.save(); ctx.translate(vx, vy);
       ctx.fillStyle = nuit > .4 ? "rgba(30,34,54,.95)" : "rgba(60,48,38,.92)";
