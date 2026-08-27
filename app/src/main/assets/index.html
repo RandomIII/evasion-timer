@@ -1103,9 +1103,23 @@
   const MENU = ["🍔","🍟","🌭","🍕","🥐","🧀","🥖","☕","🍎","🥗","🍩","🥓"];
   let W = 0, Hh = 0, dpr = 1, stars = [], food = [], bursts = [];
 
+  /* Qualité adaptative : on mesure l'intervalle réel entre deux images, seul
+     signal qui capte aussi le coût de composition, invisible depuis le JS. Sur
+     un téléphone c'est le remplissage qui coûte, pas le calcul. */
+  let qual = 1, qualN = 0, qualSom = 0, qualDer = 0;
+  function jaugeQualite(now){
+    const dt = qualDer ? now - qualDer : 0;
+    qualDer = now;
+    if (dt > 2 && dt < 400){ qualSom += dt; qualN++; }
+    if (qualN < 90) return;
+    const moy = qualSom / qualN; qualSom = 0; qualN = 0;
+    const cible = save.actif === "village" ? 33 : 17;
+    if (moy > cible * 1.45 && qual > .6){ qual = Math.max(.6, qual - .2); resize(); }
+    else if (moy < cible * 1.10 && qual < 1){ qual = Math.min(1, qual + .2); resize(); }
+  }
   function resize(){
     const win = hostWin();                          // suit l'appli si elle est épinglée en PiP
-    dpr = Math.min(win.devicePixelRatio || 1, 2);
+    dpr = Math.min(win.devicePixelRatio || 1, 2) * qual;
     W = cv.width = win.innerWidth * dpr; Hh = cv.height = win.innerHeight * dpr;
     cv.style.width = win.innerWidth + "px"; cv.style.height = win.innerHeight + "px";
   }
@@ -3876,17 +3890,20 @@ function dessineNid(c, E, x, y, t, nuit) {
     if (vilPret) return;
     vilPret = true;
     // deux rangées : le fond, plus petit et plus haut, donne la profondeur
-    const pose = (n, dy, ech, fond) => {
-      for (let i = 0; i < n; i++){
+    /* Emplacements posés à la main plutôt que répartis : la rangée du fond
+       s'intercale dans les vides de celle de devant, et le monument garde une
+       parcelle vide de chaque côté. Réparties régulièrement, les deux rangées
+       finissaient par s'interpénétrer. */
+    const pose = (xs, dy, ech, fond) => {
+      for (const u of xs){
         const k = PARCELLES.length;
-        PARCELLES.push({ u: (i + .5) / n + Math.sin(i * 12.9 + n) * .035,
-                         dy: dy, ech: ech, fond: fond,
+        PARCELLES.push({ u: u, dy: dy, ech: ech, fond: fond,
                          dec: ((k * .618) % 1) * .9 + .05,
                          gr: Math.abs(Math.sin(k * 7.13) * 43758.5) % 1 });
       }
     };
-    pose(4, .000, .62, true);
-    pose(5, .055, 1.00, false);
+    pose([.17, .36, .55, .80], .000, .56, true);
+    pose([.08, .27, .46, .88], .058, 1.00, false);
     // rang de chantier : le bâtisseur remonte le village de gauche à droite
     PARCELLES.map((q, i) => i).sort((a2, b2) => PARCELLES[a2].u - PARCELLES[b2].u)
              .forEach((idx, rang) => { PARCELLES[idx].rang = rang; });
@@ -15098,7 +15115,7 @@ function dessineNid(c, E, x, y, t, nuit) {
       g.save();
       g.globalCompositeOperation = "source-atop";
       g.fillStyle = "rgba(" + Math.round(cb[0] * .52) + "," + Math.round(cb[1] * .58)
-                  + "," + Math.round(cb[2] * .66) + ",.34)";
+                  + "," + Math.round(cb[2] * .66) + ",.46)";
       g.fillRect(0, 0, W, Hh);
       g.restore();
 
@@ -15226,11 +15243,11 @@ function dessineNid(c, E, x, y, t, nuit) {
 
     paysageNuages(ctx, W, Hh, solY, eePay, nuit, t0, E, om, al);
     // le décor bascule d'un bloc derrière le monument, en fondu court
-    ctx.drawImage(decorVillage(iEre, nuit, solY, E), 0, 0, W, Hh);
+    const dcv = decorVillage(iEre, nuit, solY, E);
+    if (dcv) ctx.drawImage(dcv, 0, 0, W, Hh);
     if (fd > 0){
-      ctx.globalAlpha = fd;
-      ctx.drawImage(decorVillage(suiv, nuit, solY, E), 0, 0, W, Hh);
-      ctx.globalAlpha = 1;
+      const dc2 = decorVillage(suiv, nuit, solY, E);
+      if (dc2){ ctx.globalAlpha = fd; ctx.drawImage(dc2, 0, 0, W, Hh); ctx.globalAlpha = 1; }
     }
     /* Voile d'horizon : la ligne de sol séparait le cadre en deux images sans
        transition, un lointain pâle posé sur un premier plan sombre. */
@@ -15263,7 +15280,7 @@ function dessineNid(c, E, x, y, t, nuit) {
       const gm = faitM ? Math.max(0, Math.min(1, (u - SEUIL_MON) / .022)) : 1;
       const HM = (Hh - solY) * 1.45 * (.55 + em * .16);
       ctx.save();
-      ctx.translate(W * .70, solY + (Hh - solY) * .026);
+      ctx.translate(W * .67, solY + (Hh - solY) * .030);
       if (gm < 1){                     // même règle que les maisons : on révèle par le bas
         ctx.beginPath();
         ctx.rect(-W, -HM * 1.3 * gm, 2 * W, HM * 1.3 * gm + 4);
@@ -15274,6 +15291,21 @@ function dessineNid(c, E, x, y, t, nuit) {
     }
     if (aDebloque("algues")) for (const r of rendu){
       if (!r.q.fond) dessineParcelle(r, solY, ee, nuit, t0, E, cielBas);
+    }
+    /* L'herbe du premier plan est redessinée par-dessus les pieds des bâtiments.
+       C'est ce recouvrement qui les inscrit dans le sol au lieu de les poser
+       dessus, et c'est gratuit : le décor est déjà cuit. */
+    if (dcv){
+      const yb = solY + (Hh - solY) * .062, fe = (Hh - solY) * .05;
+      /* Le haut de la bande est monté en six tranches d'opacité croissante :
+         d'un bloc, il coupait les pieds des maisons d'un trait net. */
+      for (let i = 0; i < 6; i++){
+        const y0 = yb - fe + fe * (i / 6), hh = fe / 6 + 1;
+        ctx.globalAlpha = (i + 1) / 6 * .9;
+        ctx.drawImage(dcv, 0, y0 / RD, dcv.width, hh / RD, 0, y0, W, hh);
+      }
+      ctx.globalAlpha = 1;
+      ctx.drawImage(dcv, 0, yb / RD, dcv.width, (Hh - yb) / RD, 0, yb, W, Hh - yb);
     }
     if (chantier) dessineOuvrier(rendu, u, iEre, solY, nuit, t0, E);
 
@@ -15423,7 +15455,7 @@ function dessineNid(c, E, x, y, t, nuit) {
                                         W * .5, Hh * .48, Math.max(W, Hh) * .78);
     vg.addColorStop(0,   "rgba(8,10,20," + (.17 - nuit * .09) + ")");
     vg.addColorStop(.34, "rgba(6,8,16," + (.04 - nuit * .02) + ")");
-    vg.addColorStop(1,   "rgba(0,4,10," + (.14 + nuit * .22) + ")");
+    vg.addColorStop(1,   "rgba(0,4,10," + (.09 + nuit * .20) + ")");
     ctx.fillStyle = vg; ctx.fillRect(0, 0, W, Hh);
   }
 
@@ -15475,7 +15507,7 @@ function dessineNid(c, E, x, y, t, nuit) {
       etapes[r.q.rang] = { x: r.q.u * W, y: solY + (Hh - solY) * r.q.dy,
                            s: r.s, L: (78 + r.q.gr * 30) * E * r.q.ech,
                            H: (58 + r.q.gr * 26 + r.e * 26) * E * r.q.ech };
-    etapes.push({ x: W * .70, y: solY + (Hh - solY) * .026, s: .84,
+    etapes.push({ x: W * .67, y: solY + (Hh - solY) * .030, s: .84,
                   L: 120 * E, H: (Hh - solY) * 1.45 });
     const TRAV = .035;                       // durée du travail sur place, en avancement
     let j = 0;
@@ -15522,14 +15554,26 @@ function dessineNid(c, E, x, y, t, nuit) {
     const L = (78 + q.gr * 30) * E * q.ech;
     const H = (58 + q.gr * 26 + r.e * 26) * E * q.ech;
     const sp = spriteBati(r.e, q.dec, L, H, q.gr, nuit + (q.fond ? .18 : 0),
-                          q.fond ? .40 : .11, cielBas);
+                          q.fond ? .56 : .10, cielBas);
     const g2 = Math.max(0, Math.min(1, r.g));
     ctx.save();
-    ctx.fillStyle = "rgba(14,11,8," + ((q.fond ? .15 : .30) * (1 - nuit * .5)) + ")";
+    /* Tapis de terre foulée, puis ombre portée couchée vers le bas-gauche
+       puisque la lumière vient du haut-droite. Une ellipse noire centrée
+       débordait de chaque côté et se lisait comme une flaque. */
+    const cx = q.u * W, sm = 1 - nuit * .55;
+    ctx.fillStyle = "rgba(86,70,50," + (.16 * sm).toFixed(3) + ")";
     ctx.beginPath();
-    ctx.ellipse(q.u * W, base, L * .56, Math.max(2, L * .075), 0, 0, 6.283);
+    ctx.ellipse(cx, base + L * .012, L * .52, Math.max(2, L * .085), 0, 0, 6.283);
     ctx.fill();
-    if (q.fond){ ctx.globalAlpha = .92; }
+    ctx.save();
+    ctx.translate(cx, base);
+    ctx.transform(1, 0, -.44, 1, 0, 0);
+    ctx.fillStyle = "rgba(20,16,12," + (.24 * sm).toFixed(3) + ")";
+    ctx.beginPath();
+    ctx.ellipse(-L * .06, 0, L * .40, Math.max(1.5, L * .055), 0, 0, 6.283);
+    ctx.fill();
+    ctx.restore();
+    if (q.fond){ ctx.globalAlpha = .94; }
     /* La ligne de sol du sprite est à `sp.height - MARGE_BAS` : c'est elle qu'il
        faut poser sur `base`, pas le bas du canvas. Les maisons flottaient. */
     const gx = q.u * W - sp.width / 2, gy = base - (sp.height - MARGE_BAS);
@@ -16910,6 +16954,7 @@ function dessineNid(c, E, x, y, t, nuit) {
   let frames = 0, fpsT = performance.now();
   function loop(){
     hostWin().requestAnimationFrame(loop);
+    jaugeQualite(performance.now());
     const t = nowUs(), now = t / 1000;
     const b = document.body;
     // si l'appli est épinglée en PiP, son body reçoit les mêmes classes d'état
